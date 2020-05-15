@@ -29,4 +29,4 @@ jobs:
         pip install .[dev]
     - name: Test with pytest
       run: |
-        pytest
+        pytest pydra_ml/tests/test_classifier.py

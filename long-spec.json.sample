@@ -1,0 +1,25 @@
+{"filename": "breast_cancer.csv",
+ "x_indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+ 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29],
+ "target_vars": ["target"],
+ "n_splits": 100,
+ "test_size": 0.2,
+ "clf_info": [
+ ["sklearn.ensemble", "AdaBoostClassifier"],
+ ["sklearn.naive_bayes", "GaussianNB"],
+ ["sklearn.tree", "DecisionTreeClassifier", {"max_depth": 5}],
+ ["sklearn.ensemble", "RandomForestClassifier", {"n_estimators": 100}],
+ ["sklearn.ensemble", "ExtraTreesClassifier", {"n_estimators": 100, "class_weight": "balanced"}],
+ ["sklearn.linear_model", "LogisticRegressionCV", {"solver": "liblinear", "penalty": "l1"}],
+ ["sklearn.neural_network", "MLPClassifier", {"alpha": 1, "max_iter": 1000}],
+ ["sklearn.svm", "SVC", {"probability": true},
+  [{"kernel": ["rbf", "linear"], "C": [1, 10, 100, 1000]}]],
+ ["sklearn.neighbors", "KNeighborsClassifier", {},
+  [{"n_neighbors": [3, 5, 7, 9, 11, 13, 15, 17, 19],
+    "weights": ["uniform", "distance"]}]]
+ ],
+ "permute": [true, false],
+ "noshap": false,
+ "nsamples": 100,
+ "l1_reg": "aic"
+ }

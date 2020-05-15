@@ -70,9 +70,10 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
 
 
 def run_workflow(wf, n_procs):
+    cwd = os.getcwd()
     with pydra.Submitter(plugin="cf", n_procs=n_procs) as sub:
         sub(runnable=wf)
     results = wf.result(return_inputs=True)
+    os.chdir(cwd)
     gen_report(results, prefix=wf.name)
-    print(results)
     return results

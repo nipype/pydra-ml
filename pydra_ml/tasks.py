@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-import pandas as pd
-import numpy as np
 import pydra
 import typing as ty
 
@@ -9,8 +7,15 @@ import typing as ty
 @pydra.mark.task
 @pydra.mark.annotate({"return": {"X": ty.Any, "Y": ty.Any, "groups": ty.Any}})
 def read_file(filename, x_indices=None, target_vars=None, group="groups"):
+    import pandas as pd
+
     data = pd.read_csv(filename)
-    X = data.iloc[:, x_indices]
+    if isinstance(x_indices[0], int):
+        X = data.iloc[:, x_indices]
+    elif isinstance(x_indices[0], str):
+        X = data[x_indices]
+    else:
+        raise ValueError(f"{x_indices} is not a list of string or ints")
     Y = data[target_vars]
     if group in data.keys():
         groups = data[:, [group]]
@@ -38,10 +43,14 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
     from sklearn.preprocessing import StandardScaler
     from sklearn.pipeline import Pipeline
     from sklearn.metrics import roc_auc_score
+    import numpy as np
 
     mod = __import__(clf_info[0], fromlist=[clf_info[1]])
-    clf = getattr(mod, clf_info[1])(**clf_info[2])
-    if len(clf_info) > 3:
+    params = {}
+    if len(clf_info) > 2:
+        params = clf_info[2]
+    clf = getattr(mod, clf_info[1])(**params)
+    if len(clf_info) == 4:
         from sklearn.model_selection import GridSearchCV
 
         clf = GridSearchCV(clf, param_grid=clf_info[3])
@@ -52,7 +61,6 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
         pipe.fit(X[train_index], y[np.random.permutation(train_index)])
     else:
         pipe.fit(X[train_index], y[train_index])
-
     predicted = pipe.predict(X[test_index])
     auc = roc_auc_score(y[test_index], predicted)
     return auc, (y[test_index], predicted), pipe

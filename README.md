@@ -1,3 +1,5 @@
+![Python package](https://github.com/nipype/pydra-ml/workflows/Python%20package/badge.svg?branch=master)
+
 # pydra-ml
 
 for developers:

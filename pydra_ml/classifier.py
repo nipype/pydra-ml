@@ -12,7 +12,7 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
         input_spec=list(inputs.keys()),
         **inputs,
         cache_dir=cache_dir,
-        cache_locations=cache_locations
+        cache_locations=cache_locations,
     )
     wf.split(["clf_info", "permute"])
     wf.add(
@@ -76,4 +76,10 @@ def run_workflow(wf, n_procs):
     results = wf.result(return_inputs=True)
     os.chdir(cwd)
     gen_report(results, prefix=wf.name)
+    import pickle as pk
+    import datetime
+
+    timestamp = datetime.datetime.utcnow().isoformat()
+    with open(f"results-{timestamp}.pkl", "wb") as fp:
+        pk.dump(results, fp)
     return results

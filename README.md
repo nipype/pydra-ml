@@ -8,7 +8,8 @@ across a set of classifiers. The intent is to use this as an application to make
 Pydra more robust while allowing users to generate classification reports more
 easily. This application leverages Pydra's powerful splitters and combiners to
 scale across a set of classifiers and metrics. It will also use Pydra's caching
-to not perform model training and evaluation when new metrics are added.
+to not redo model training and evaluation when new metrics are added, or when 
+number of iterations (`n_splits`) is increased.
 
 Upcoming features:
 1. Improve output report containing [SHAP](https://github.com/slundberg/shap)
@@ -117,7 +118,7 @@ then an empty dictionary **MUST** be provided as parameter 3.
  "noshap": false,
  "nsamples": 100,
  "l1_reg": "aic",
- "metric": ["roc_auc_score"]
+ "metrics": ["roc_auc_score"]
  }
 ```
 
@@ -130,5 +131,6 @@ After cloning the repo do:
 
 ### Project structure
 
-- `tasks.py` contain the annotated Pydra tasks
+- `tasks.py` contain the annotated Pydra tasks.
 - `classifier.py` contains the Pydra workflow.
+- `report.py` contains report generation code.

@@ -11,5 +11,6 @@
  "permute": [true, false],
  "noshap": false,
  "nsamples": 100,
- "l1_reg": "aic"
+ "l1_reg": "aic",
+ "metrics": ["roc_auc_score", "accuracy_score"]
  }

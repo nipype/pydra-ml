@@ -17,12 +17,13 @@ inputs = {
     "noshap": False,
     "nsamples": 5,
     "l1_reg": "aic",
+    "metrics": ["roc_auc_score", "accuracy_score"],
 }
-n_procs = 1
 
 
 def test_classifier(tmpdir):
-    cache_dir = tmpdir
-    wf = gen_workflow(inputs, cache_dir=cache_dir)
-    results = run_workflow(wf, n_procs)
-    assert results is not None
+    wf = gen_workflow(inputs, cache_dir=tmpdir)
+    results = run_workflow(wf, "cf", {"n_procs": 1})
+    assert results[0][0]["ml_wf.clf_info"][1] == "MLPClassifier"
+    assert results[0][0]["ml_wf.permute"]
+    assert results[0][1].output.score[0][0] < results[1][1].output.score[0][0]

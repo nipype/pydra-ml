@@ -2,23 +2,61 @@
 
 # pydra-ml
 
-for developers:
+Pydra-ML is a demo application that leverages [Pydra](https://github.com/nipype/pydra)
+together with [scikit-learn](https://scikit-learn.org) to perform model comparison
+across a set of classifiers. The intent is to use this as an application to make
+Pydra more robust while allowing users to generate classification reports more
+easily. This application leverages Pydra's powerful splitters and combiners to
+scale across a set of classifiers and metrics. It will also use Pydra's caching
+to not perform model training and evaluation when new metrics are added.
 
-after cloning the repo do:
+Upcoming features:
+1. Improve output report containing [SHAP](https://github.com/slundberg/shap)
+  feature analysis.
+2. Allow for comparing scikit-learn pipelines.
+3. Test on scikit-learn compatible classifiers
 
-1. pip install -e .[dev]
-2. pre-commit install
+## CLI usage
 
-# CLI usage
+This repo installs `pydraml` a CLI to allow usage without any programming.
 
-to test the CLI copy the `pydra_ml/tests/data/breast_cancer.csv` and
+To test the CLI copy the `pydra_ml/tests/data/breast_cancer.csv` and
 `short-spec.json.sample` to a folder and run.
 
 ```
 $ pydraml -s short-spec.json.sample
 ```
 
-# Current specification
+This will generate a `test-{metric}-{timestamp}.png` file for each metric in the
+local folder together with a pickled results file containing all the scores from
+the model evaluations.
+
+```
+$ pydraml --help
+Usage: pydraml [OPTIONS]
+
+Options:
+  -s, --specfile PATH   Specification file to use  [required]
+  -p, --plugin TEXT...  Pydra plugin to use  [default: cf, n_procs=1]
+  -c, --cache TEXT      Cache dir  [default:
+                        /Users/satra/software/sensein/pydra-ml/cache-wf]
+
+  --help                Show this message and exit.
+```
+
+With the plugin option you can use local multiprocessing
+
+```
+$ pydraml -s ../short-spec.json.sample -p cf "n_procs=8"
+```
+
+or execution via dask.
+
+```
+$ pydraml -s ../short-spec.json.sample -p dask "address=tcp://192.168.1.154:8786"
+```
+
+## Current specification
 
 The current specification is a JSON file as shown in the example below. It needs
 to contain all the fields described here. For datasets with many features, you
@@ -36,6 +74,7 @@ will want to generate `x_indices` programmatically.
 - *noshap*: Boolean indicating whether shap values are evaluated
 - *nsamples*: Number of samples to use for shap estimation
 - *l1_reg*: Type of regularizer to use for shap estimation
+- *metrics*: scikit-learn metric to use
 
 ## `clf_info` specification
 
@@ -77,6 +116,19 @@ then an empty dictionary **MUST** be provided as parameter 3.
  "permute": [true, false],
  "noshap": false,
  "nsamples": 100,
- "l1_reg": "aic"
+ "l1_reg": "aic",
+ "metric": ["roc_auc_score"]
  }
 ```
+
+## For developers:
+
+After cloning the repo do:
+
+1. pip install -e .[dev]
+2. pre-commit install
+
+### Project structure
+
+- `tasks.py` contain the annotated Pydra tasks
+- `classifier.py` contains the Pydra workflow.

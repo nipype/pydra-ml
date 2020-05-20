@@ -8,7 +8,7 @@ across a set of classifiers. The intent is to use this as an application to make
 Pydra more robust while allowing users to generate classification reports more
 easily. This application leverages Pydra's powerful splitters and combiners to
 scale across a set of classifiers and metrics. It will also use Pydra's caching
-to not redo model training and evaluation when new metrics are added, or when 
+to not redo model training and evaluation when new metrics are added, or when
 number of iterations (`n_splits`) is increased.
 
 Upcoming features:
@@ -122,12 +122,32 @@ then an empty dictionary **MUST** be provided as parameter 3.
  }
 ```
 
-## For developers:
+### Installation
 
-After cloning the repo do:
+pydraml requires Python 3.7+.
 
-1. pip install -e .[dev]
-2. pre-commit install
+```
+git clone https://github.com/nipype/pydra-ml.git
+cd pydra-ml
+pip install -e .
+```
+
+## Developer installation
+
+Install repo in developer mode:
+
+```
+git clone https://github.com/nipype/pydra-ml.git
+cd pydra-ml
+pip install -e .[dev]
+```
+
+It is also useful to install pre-commit:
+
+```
+pip install pre-commit
+pre-commit
+```
 
 ### Project structure
 

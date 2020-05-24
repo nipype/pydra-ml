@@ -19,8 +19,11 @@
     "weights": ["uniform", "distance"]}]]
  ],
  "permute": [true, false],
- "noshap": false,
+ "gen_shap": true,
  "nsamples": 100,
  "l1_reg": "aic",
- "metric": ["roc_auc_score", "accuracy_score"]
+ "plot_shap": true,
+ "plot_top_n_shap": 16,
+ "confusion_matrix": true,
+ "metrics": ["roc_auc_score", "accuracy_score"]
  }

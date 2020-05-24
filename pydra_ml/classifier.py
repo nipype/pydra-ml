@@ -58,7 +58,7 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
             X=wf.readcsv.lzout.X,
             permute=wf.lzin.permute,
             model=wf.fit_clf.lzout.model,
-            noshap=wf.lzin.noshap,
+            gen_shap=wf.lzin.gen_shap,
             nsamples=wf.lzin.nsamples,
             l1_reg=wf.lzin.l1_reg,
         )
@@ -69,6 +69,7 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
             ("output", wf.metric.lzout.output),
             ("score", wf.metric.lzout.score),
             ("shaps", wf.shap.lzout.shaps),
+            ("feature_names", wf.readcsv.lzout.feature_names),
         ]
     )
     return wf
@@ -86,5 +87,14 @@ def run_workflow(wf, plugin, plugin_args):
     timestamp = datetime.datetime.utcnow().isoformat()
     with open(f"results-{timestamp}.pkl", "wb") as fp:
         pk.dump(results, fp)
-    gen_report(results, prefix=wf.name, metrics=wf.inputs.metrics)
+
+    gen_report(
+        results,
+        prefix=wf.name,
+        metrics=wf.inputs.metrics,
+        confusion_matrix=wf.inputs.confusion_matrix,
+        gen_shap=wf.inputs.gen_shap,
+        plot_shap=wf.inputs.plot_shap,
+        plot_top_n_shap=wf.inputs.plot_top_n_shap,
+    )
     return results

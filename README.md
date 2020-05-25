@@ -72,9 +72,10 @@ will want to generate `x_indices` programmatically.
 - *test_size*: Fraction of data to use for test set in each iteration
 - *clf_info*: List of scikit-learn classifiers to use.
 - *permute*: List of booleans to indicate whether to generate a null model or not
-- *noshap*: Boolean indicating whether shap values are evaluated
+- *gen_shap*: Boolean indicating whether shap values are generated
 - *nsamples*: Number of samples to use for shap estimation
 - *l1_reg*: Type of regularizer to use for shap estimation
+- *plot_top_n_shap*: Number or proportion of top SHAP values to plot (e.g., 16 or 0.1 for top 10%). Set to 1.0 (float) to plot all features or 1 (int) to plot top first feature.
 - *metrics*: scikit-learn metric to use
 
 ## `clf_info` specification
@@ -115,12 +116,36 @@ then an empty dictionary **MUST** be provided as parameter 3.
     "weights": ["uniform", "distance"]}]]
  ],
  "permute": [true, false],
- "noshap": false,
+ "gen_shap": true,
  "nsamples": 100,
  "l1_reg": "aic",
+ "plot_top_n_shap": 16,
  "metrics": ["roc_auc_score"]
  }
 ```
+
+## Output:
+The workflow will output:
+- `results-{timestamp}.pkl` containing 1 list per model used. For example, if assigned to variable `results`, it is accessed through `results[0]` to `results[N]`
+(if `permute: [false,true]` then it will output the model trained on the labels first `results[0]` and the model trained on permuted labels second `results[1]`.
+Each model contains:
+    - `dict` accesed through `results[0][0]` with model information: `{'ml_wf.clf_info': ['sklearn.neural_network', 'MLPClassifier', {'alpha': 1, 'max_iter': 1000}], 'ml_wf.permute': False}`
+    - `pydra Result obj` accesed through `results[0][1]` with attribute `output` which itself has attributes:
+        - `feature_names`: from the columns of the data csv.
+        And the following attributes organized in N lists for N bootstrapping samples:
+        - `output`: N lists, each one with two lists for true and predicted labels.
+        - `score`: N lists each one containing M different metric scores.
+        - `shaps`: N lists each one with a list of shape (P,F) where P is the amount of predictions and F the different SHAP values for each feature. `shaps` is empty if `gen_shap` is set to `false` or if `permute` is set to true.
+- One figure per metric with performance distribution across splits (with or without null distribution trained on permuted labels)
+- `shap-{timestamp}` dir
+    - SHAP values are computed for each prediction in each split's test set
+    (e.g., 30 bootstrapping splits with 100 prediction will create (30,100) array). The mean is taken across predictions for each split (e.g., resulting in a (64,30) array for 64 features and 30 bootstrapping samples).
+    - For binary classification, a more accurate display of feature importance obtained by splitting predictions into TP, TN, FP, and FN,
+    which in turn can allow for error auditing (i.e., what a model pays attention to when making incorrect/false predictions)
+        - `quadrant_indexes.pkl`: The TP, TN, FP, FN indexes are saved in  as a `dict` with one `key` per model (permuted models without SHAP values will be skipped automatically), and each key `values` being a bootstrapping split.
+        - `summary_values_shap_{model_name}_{prediction_type}.csv` contains all SHAP values and summary statistics ranked by the mean SHAP value across bootstrapping splits. A sample_n column can be empty or NaN if this split did not have the type of prediction in the filename (e.g., you may not have FNs or FPs in a given split with high performance).
+        - `summary_shap_{model_name}_{plot_top_n_shap}.png` contains SHAP value summary statistics for all features (set to 1.0) or only the top N most important features for better visualization.
+
 
 ### Installation
 
@@ -143,7 +168,6 @@ pip install -e .[dev]
 ```
 
 It is also useful to install pre-commit:
-
 ```
 pip install pre-commit
 pre-commit

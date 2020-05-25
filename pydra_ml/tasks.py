@@ -2,10 +2,13 @@
 
 import pydra
 import typing as ty
+import numpy as np
 
 
 @pydra.mark.task
-@pydra.mark.annotate({"return": {"X": ty.Any, "Y": ty.Any, "groups": ty.Any}})
+@pydra.mark.annotate(
+    {"return": {"X": ty.Any, "Y": ty.Any, "groups": ty.Any, "feature_names": ty.Any}}
+)
 def read_file(filename, x_indices=None, target_vars=None, group="groups"):
     import pandas as pd
 
@@ -21,7 +24,8 @@ def read_file(filename, x_indices=None, target_vars=None, group="groups"):
         groups = data[:, [group]]
     else:
         groups = list(range(X.shape[0]))
-    return X.values, Y.values, groups
+    feature_names = list(X.columns)
+    return X.values, Y.values, groups, feature_names
 
 
 @pydra.mark.task
@@ -77,8 +81,8 @@ def calc_metric(output, metrics):
 
 @pydra.mark.task
 @pydra.mark.annotate({"return": {"shaps": ty.Any}})
-def get_shap(X, permute, model, noshap=False, nsamples="auto", l1_reg="aic"):
-    if permute or noshap:
+def get_shap(X, permute, model, gen_shap=False, nsamples="auto", l1_reg="aic"):
+    if permute or not gen_shap:
         return []
     pipe, train_index, test_index = model
     import shap

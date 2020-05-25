@@ -14,9 +14,10 @@ inputs = {
     "test_size": 0.2,
     "clf_info": clfs,
     "permute": [True, False],
-    "noshap": False,
+    "gen_shap": True,
     "nsamples": 5,
     "l1_reg": "aic",
+    "plot_top_n_shap": 16,
     "metrics": ["roc_auc_score", "accuracy_score"],
 }
 

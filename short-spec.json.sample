@@ -8,9 +8,10 @@
   ["sklearn.neural_network", "MLPClassifier", {"alpha": 1, "max_iter": 1000}],
   ["sklearn.tree", "DecisionTreeClassifier", {"max_depth": 5}]
  ],
- "permute": [true, false],
- "noshap": false,
+ "permute": [false, true],
+ "gen_shap": true,
  "nsamples": 100,
  "l1_reg": "aic",
+ "plot_top_n_shap": 16,
  "metrics": ["roc_auc_score", "accuracy_score"]
  }

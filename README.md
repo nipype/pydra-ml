@@ -126,8 +126,8 @@ then an empty dictionary **MUST** be provided as parameter 3.
 
 ## Output:
 The workflow will output:
-- `results-{timestamp}.pkl` containing a list per model used `results[0]` to `results[N]`
-(if `permute == [false,true]` then it will output the model trained on the labels first `results[0]` and the model trained on permuted labels second `results[1]`.
+- `results-{timestamp}.pkl` containing 1 list per model used. For example, if assigned to variable `results`, it is accessed through `results[0]` to `results[N]`
+(if `permute: [false,true]` then it will output the model trained on the labels first `results[0]` and the model trained on permuted labels second `results[1]`.
 Each model contains:
     - `dict` accesed through `results[0][0]` with model information: `{'ml_wf.clf_info': ['sklearn.neural_network', 'MLPClassifier', {'alpha': 1, 'max_iter': 1000}], 'ml_wf.permute': False}`
     - `pydra Result obj` accesed through `results[0][1]` with attribute `output` which itself has attributes:
@@ -144,7 +144,7 @@ Each model contains:
     which in turn can allow for error auditing (i.e., what a model pays attention to when making incorrect/false predictions)
         - `quadrant_indexes.pkl`: The TP, TN, FP, FN indexes are saved in  as a `dict` with one `key` per model (permuted models without SHAP values will be skipped automatically), and each key `values` being a bootstrapping split.
         - `summary_values_shap_{model_name}_{prediction_type}.csv` contains all SHAP values and summary statistics ranked by the mean SHAP value across bootstrapping splits. A sample_n column can be empty or NaN if this split did not have the type of prediction in the filename (e.g., you may not have FNs or FPs in a given split with high performance).
-        - `summary_shap_{model_name}_{plot_top_n_shap}.png` contains SHAP value summary statistics for only the top N most important features for better visualization.
+        - `summary_shap_{model_name}_{plot_top_n_shap}.png` contains SHAP value summary statistics for all features (set to 1.0) or only the top N most important features for better visualization.
 
 
 ### Installation
@@ -168,7 +168,6 @@ pip install -e .[dev]
 ```
 
 It is also useful to install pre-commit:
-
 ```
 pip install pre-commit
 pre-commit

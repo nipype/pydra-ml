@@ -75,7 +75,7 @@ will want to generate `x_indices` programmatically.
 - *gen_shap*: Boolean indicating whether shap values are generated
 - *nsamples*: Number of samples to use for shap estimation
 - *l1_reg*: Type of regularizer to use for shap estimation
-- *plot_top_n_shap*: Number or proportion of top SHAP values to plot (e.g., 16 or 0.1 for top 10%). Set to 1.0 (to plot all features or 1 to plot top first feature.
+- *plot_top_n_shap*: Number or proportion of top SHAP values to plot (e.g., 16 or 0.1 for top 10%). Set to 1.0 (float) to plot all features or 1 (int) to plot top first feature.
 - *metrics*: scikit-learn metric to use
 
 ## `clf_info` specification

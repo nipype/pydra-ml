@@ -72,12 +72,10 @@ will want to generate `x_indices` programmatically.
 - *test_size*: Fraction of data to use for test set in each iteration
 - *clf_info*: List of scikit-learn classifiers to use.
 - *permute*: List of booleans to indicate whether to generate a null model or not
-- *gen_shap*: Boolean indicating whether shap values are evaluated
+- *gen_shap*: Boolean indicating whether shap values are generated
 - *nsamples*: Number of samples to use for shap estimation
 - *l1_reg*: Type of regularizer to use for shap estimation
-- *plot_shap*: Boolean indicating whether shap values are plotted (csv will be created if gen_shap is true)
-- *plot_top_n_shap*: Number of top shap values to plot ranked by mean across splits
-- *confusion_matrix*: Boolean indicating whether to also compute SHAP values for TP, TN, FP, and FN
+- *plot_top_n_shap*: Number or proportion of top SHAP values to plot (e.g., 16 or 0.1 for top 10%). Set to 1.0 (to plot all features or 1 to plot top first feature.
 - *metrics*: scikit-learn metric to use
 
 ## `clf_info` specification
@@ -121,9 +119,7 @@ then an empty dictionary **MUST** be provided as parameter 3.
  "gen_shap": true,
  "nsamples": 100,
  "l1_reg": "aic",
- "plot_shap": true,
  "plot_top_n_shap": 16,
- "confusion_matrix": true,
  "metrics": ["roc_auc_score"]
  }
 ```
@@ -144,11 +140,11 @@ Each model contains:
 - `shap-{timestamp}` dir
     - SHAP values are computed for each prediction in each split's test set
     (e.g., 30 bootstrapping splits with 100 prediction will create (30,100) array). The mean is taken across predictions for each split (e.g., resulting in a (64,30) array for 64 features and 30 bootstrapping samples).
-    - `"confusion_matrix": true` and binary classification: will also create a more accurate display of feature importance obtained by splitting predictions into TP, TN, FP, and FN,
+    - For binary classification, a more accurate display of feature importance obtained by splitting predictions into TP, TN, FP, and FN,
     which in turn can allow for error auditing (i.e., what a model pays attention to when making incorrect/false predictions)
         - `quadrant_indexes.pkl`: The TP, TN, FP, FN indexes are saved in  as a `dict` with one `key` per model (permuted models without SHAP values will be skipped automatically), and each key `values` being a bootstrapping split.
         - `summary_values_shap_{model_name}_{prediction_type}.csv` contains all SHAP values and summary statistics ranked by the mean SHAP value across bootstrapping splits. A sample_n column can be empty or NaN if this split did not have the type of prediction in the filename (e.g., you may not have FNs or FPs in a given split with high performance).
-        - `summary_shap_{model_name}_{plot_top_n_shap}.png` contains SHAP value summary statistics for the top N most important features (defined in `plot_top_n_shap`) for better visualization.
+        - `summary_shap_{model_name}_{plot_top_n_shap}.png` contains SHAP value summary statistics for only the top N most important features for better visualization.
 
 
 ### Installation

@@ -92,9 +92,7 @@ def run_workflow(wf, plugin, plugin_args):
         results,
         prefix=wf.name,
         metrics=wf.inputs.metrics,
-        confusion_matrix=wf.inputs.confusion_matrix,
         gen_shap=wf.inputs.gen_shap,
-        plot_shap=wf.inputs.plot_shap,
         plot_top_n_shap=wf.inputs.plot_top_n_shap,
     )
     return results

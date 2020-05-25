@@ -12,8 +12,6 @@
  "gen_shap": true,
  "nsamples": 100,
  "l1_reg": "aic",
- "plot_shap": true,
- "plot_top_n_shap": 16,
- "confusion_matrix": true,
+ "plot_top_n_shap": 1.0,
  "metrics": ["roc_auc_score", "accuracy_score"]
  }

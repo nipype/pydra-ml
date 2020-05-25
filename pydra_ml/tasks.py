@@ -23,7 +23,7 @@ def read_file(filename, x_indices=None, target_vars=None, group="groups"):
     if group in data.keys():
         groups = data[:, [group]]
     else:
-        groups = np.array(range(X.shape[0]))
+        groups = list(range(X.shape[0]))
     feature_names = list(X.columns)
     return X.values, Y.values, groups, feature_names
 

@@ -17,6 +17,14 @@ Upcoming features:
 2. Allow for comparing scikit-learn pipelines.
 3. Test on scikit-learn compatible classifiers
 
+### Installation
+
+pydraml requires Python 3.7+.
+
+```
+pip install pydra-ml
+```
+
 ## CLI usage
 
 This repo installs `pydraml` a CLI to allow usage without any programming.
@@ -146,16 +154,6 @@ Each model contains:
         - `summary_values_shap_{model_name}_{prediction_type}.csv` contains all SHAP values and summary statistics ranked by the mean SHAP value across bootstrapping splits. A sample_n column can be empty or NaN if this split did not have the type of prediction in the filename (e.g., you may not have FNs or FPs in a given split with high performance).
         - `summary_shap_{model_name}_{plot_top_n_shap}.png` contains SHAP value summary statistics for all features (set to 1.0) or only the top N most important features for better visualization.
 
-
-### Installation
-
-pydraml requires Python 3.7+.
-
-```
-git clone https://github.com/nipype/pydra-ml.git
-cd pydra-ml
-pip install -e .
-```
 
 ## Developer installation
 

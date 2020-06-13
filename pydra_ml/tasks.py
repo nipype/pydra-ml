@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
-import pydra
-import typing as ty
-import numpy as np
 
+def read_file(filename, x_indices=None, target_vars=None, group=None):
+    """Read a CSV data file
 
-@pydra.mark.task
-@pydra.mark.annotate(
-    {"return": {"X": ty.Any, "Y": ty.Any, "groups": ty.Any, "feature_names": ty.Any}}
-)
-def read_file(filename, x_indices=None, target_vars=None, group="groups"):
+    :param filename: CSV filename containing a column header
+    :param x_indices: integer or string indices
+    :param target_vars: Target variables to use
+    :param group: CSV column name containing grouping information
+    :return: Tuple containing train data, target data, groups, features
+    """
     import pandas as pd
 
     data = pd.read_csv(filename)
@@ -20,17 +20,27 @@ def read_file(filename, x_indices=None, target_vars=None, group="groups"):
     else:
         raise ValueError(f"{x_indices} is not a list of string or ints")
     Y = data[target_vars]
-    if group in data.keys():
-        groups = data[:, [group]]
-    else:
+    if group is None:
         groups = list(range(X.shape[0]))
+    else:
+        groups = data[:, [group]]
     feature_names = list(X.columns)
     return X.values, Y.values, groups, feature_names
 
 
-@pydra.mark.task
-@pydra.mark.annotate({"return": {"splits": ty.Any, "split_indices": ty.Any}})
 def gen_splits(n_splits, test_size, X, Y, groups=None, random_state=0):
+    """Generate train-test splits for the data.
+
+    Uses GroupShuffleSplit from scikit-learn
+
+    :param n_splits: Number of splits
+    :param test_size: fractional test size
+    :param X: Sample feature data
+    :param Y: Sample target data
+    :param groups: Grouping of sample data for shufflesplit
+    :param random_state: randomization for shuffling (default 0)
+    :return: splits and indices to splits
+    """
     from sklearn.model_selection import GroupShuffleSplit
 
     gss = GroupShuffleSplit(
@@ -41,9 +51,17 @@ def gen_splits(n_splits, test_size, X, Y, groups=None, random_state=0):
     return train_test_splits, split_indices
 
 
-@pydra.mark.task
-@pydra.mark.annotate({"return": {"output": ty.Any, "model": ty.Any}})
-def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute, metrics):
+def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
+    """Core model fitting and predicting function
+
+    :param X: Input features
+    :param y: Target variables
+    :param train_test_split: split indices
+    :param split_index: which index to use
+    :param clf_info: how to construct the classifier
+    :param permute: whether to run it in permuted mode or not
+    :return: outputs, trained classifier with sample indices
+    """
     from sklearn.preprocessing import StandardScaler
     from sklearn.pipeline import Pipeline
     import numpy as np
@@ -68,9 +86,13 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute, me
     return (y[test_index], predicted), (pipe, train_index, test_index)
 
 
-@pydra.mark.task
-@pydra.mark.annotate({"return": {"score": ty.Any, "output": ty.Any}})
 def calc_metric(output, metrics):
+    """Calculate the scores for the predicted outputs
+
+    :param output: true, predicted output
+    :param metrics: list of metrics to evaluate
+    :return: list of scores and pass the output
+    """
     score = []
     for metric in metrics:
         metric_mod = __import__("sklearn.metrics", fromlist=[metric])
@@ -79,9 +101,17 @@ def calc_metric(output, metrics):
     return score, output
 
 
-@pydra.mark.task
-@pydra.mark.annotate({"return": {"shaps": ty.Any}})
 def get_shap(X, permute, model, gen_shap=False, nsamples="auto", l1_reg="aic"):
+    """Compute shap information for the test data
+
+    :param X: sample data
+    :param permute: whether model was permuted or not
+    :param model: model containing trained classifier and train/test index
+    :param gen_shap: whether to generate shap features
+    :param nsamples: number of samples for shap evaluation
+    :param l1_reg: L1 regularization for shap evaluation
+    :return: shap values for each test sample
+    """
     if permute or not gen_shap:
         return []
     pipe, train_index, test_index = model

@@ -14,12 +14,7 @@ def save_obj(obj, path):
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 
-def plot_summary(
-    summary,
-    output_dir=None,
-    filename="shap_LogisticRegression_all_predictions",
-    plot_top_n_shap=16,
-):
+def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap=16):
     plt.clf()
     plt.figure(figsize=(8, 12))
     # plot without all bootstrapping values
@@ -54,7 +49,7 @@ def shaps_to_summary(
     shaps_n_splits,
     feature_names=None,
     output_dir=None,
-    filename="shap_LogisticRegression_all_predictions",
+    filename="shap_summary",
     plot_top_n_shap=16,
 ):
     shaps_n_splits.columns = [
@@ -84,6 +79,7 @@ def shaps_to_summary(
 def gen_report_shap(results, output_dir="./", plot_top_n_shap=16):
     # Create shap_dir
     timestamp = datetime.datetime.utcnow().isoformat()
+    timestamp = timestamp.replace(":", "").replace("-", "")
     shap_dir = output_dir + f"shap-{timestamp}/"
     os.mkdir(shap_dir)
 
@@ -213,6 +209,7 @@ def gen_report(
         import datetime
 
         timestamp = datetime.datetime.utcnow().isoformat()
+        timestamp = timestamp.replace(":", "").replace("-", "")
         plt.savefig(f"test-{name}-{timestamp}.png")
 
     # create SHAP summary csv and figures

@@ -45,4 +45,4 @@ def main(specfile, plugin, cache):
         if plugin[0] == "cf" and key == "n_procs":
             value = int(value)
         plugin_args[key] = value
-    run_workflow(wf, plugin[0], plugin_args)
+    run_workflow(wf, plugin[0], plugin_args, specfile)

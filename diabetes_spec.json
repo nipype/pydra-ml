@@ -1,0 +1,17 @@
+{"filename": "./diabetes_table.csv",
+ "x_indices": [0,1,2,3,4,5,6,7,8,9],
+ "target_vars": ["target"],
+ "n_splits": 4,
+ "test_size": 0.2,
+ "clf_info": [
+    ["sklearn.linear_model","RidgeCV",{"fit_intercept": true,"normalize": true}],
+    ["sklearn.linear_model","LassoCV",{"fit_intercept": true,"normalize": true}],
+    ["sklearn.linear_model","ElasticNetCV",{"fit_intercept": true,"normalize": true}]
+  ],
+  "permute": [true,false],
+  "gen_shap": true,
+  "nsamples": 100,
+  "l1_reg": "aic",
+  "plot_top_n_shap": 10,
+  "metrics":["explained_variance_score","mean_squared_error","mean_absolute_error"]
+}

@@ -4,7 +4,7 @@ import os
 import pickle
 import pandas as pd
 import numpy as np
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, explained_variance_score
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -76,7 +76,7 @@ def shaps_to_summary(
     return
 
 
-def gen_report_shap(results, output_dir="./", plot_top_n_shap=16):
+def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
     # Create shap_dir
     timestamp = datetime.datetime.utcnow().isoformat()
     timestamp = timestamp.replace(":", "").replace("-", "")
@@ -112,7 +112,8 @@ def gen_report_shap(results, output_dir="./", plot_top_n_shap=16):
             shaps_i = shaps[split_i]  # all shap values for this bootstrapping split
             y_true = y_true_and_preds[split_i][0]
             y_pred = y_true_and_preds[split_i][1]
-            split_performance = accuracy_score(y_true, y_pred)
+            #split_performance = accuracy_score(y_true, y_pred)
+            split_performance = explained_variance_score(y_true, y_pred)
 
             # split prediction indexes into TP, TN, FP, FN, good for error auditing
             indexes = {"tp": [], "tn": [], "fp": [], "fn": []}
@@ -126,6 +127,7 @@ def gen_report_shap(results, output_dir="./", plot_top_n_shap=16):
                 elif y_true[i] != y_pred[i] and y_pred[i] == 0:
                     indexes["fn"].append(i)
             indexes_all[model_name].append(indexes)
+
             #  For each quadrant, obtain F shap values for P predictions, take the absolute mean weighted by performance across all predictions
             for quadrant in ["tp", "tn", "fp", "fn"]:
                 if len(indexes.get(quadrant)) == 0:
@@ -166,6 +168,98 @@ def gen_report_shap(results, output_dir="./", plot_top_n_shap=16):
     save_obj(indexes_all, shap_dir + "indexes_quadrant.pkl")
     return
 
+def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
+    # Create shap_dir
+    timestamp = datetime.datetime.utcnow().isoformat()
+    timestamp = timestamp.replace(":", "").replace("-", "")
+    shap_dir = output_dir + f"shap-{timestamp}/"
+    os.mkdir(shap_dir)
+
+    feature_names = results[0][1].output.feature_names
+    # save all TP, TN, FP, FN indexes
+    indexes_all = {}
+
+    for model_results in results:
+        model_name = model_results[0].get("ml_wf.clf_info")[1]
+        indexes_all[model_name] = []
+        shaps = model_results[
+            1
+        ].output.shaps  # this is (N, P, F) N splits, P predictions, F feature_names
+        # make sure there are shap values (the
+        if np.array(shaps[0]).size == 0:
+            continue
+
+        y_true_and_preds = model_results[1].output.output
+        n_splits = len(y_true_and_preds)
+
+        shaps_n_splits = {
+            "all": [],
+            "lp": [],
+            "lm": [],
+            "um": [],
+            "up": []   
+        }  # this is key with shape (F, N) where F is feature_names, N is mean shap values across splits
+        # Obtain values for each bootstrapping split, then append summary statistics to shaps_n_splits
+        for split_i in range(n_splits):
+            shaps_i = shaps[split_i]  # all shap values for this bootstrapping split
+            y_true = y_true_and_preds[split_i][0]
+            y_pred = y_true_and_preds[split_i][1]
+            split_performance = explained_variance_score(y_true, y_pred)
+
+            # split prediction indexes into upper, median, lower, good for error auditing
+            indexes = {"lp": [], "lm": [], "um": [], "up": []}
+            q=np.array([25,50,75])
+            prc=np.percentile(y_true,q)
+            for i in range(len(y_true)):
+                if prc[0] >= y_pred[i]:
+                    indexes["lp"].append(i)
+                elif prc[0] < y_pred[i] and prc[1] >= y_pred[i]:
+                    indexes["lm"].append(i)
+                elif prc[1] < y_pred[i] and prc[2] >= y_pred[i]:
+                    indexes["um"].append(i)
+                elif prc[2] < y_pred[i]:
+                    indexes["up"].append(i)
+            indexes_all[model_name].append(indexes)
+
+            #  For each quadrant, obtain F shap values for P predictions, take the absolute mean weighted by performance across all predictions
+            for quadrant in ["lp", "lm", "um", "up"]:
+                if len(indexes.get(quadrant)) == 0:
+                    warnings.warn(
+                        f"There were no {quadrant.upper()}s, this will output NaNs in the csv and figure for this split column"
+                    )
+                shaps_i_quadrant = shaps_i[
+                    indexes.get(quadrant)
+                ]  # shape (P, F) P prediction x F feature_names
+                abs_weighted_shap_values = np.abs(shaps_i_quadrant) * split_performance
+                shaps_n_splits[quadrant].append(
+                    np.mean(abs_weighted_shap_values, axis=0)
+                )
+            #  obtain F shap values for P predictions, take the absolute mean weighted by performance across all predictions
+            abs_weighted_shap_values = np.abs(shaps_i) * split_performance
+            shaps_n_splits["all"].append(np.mean(abs_weighted_shap_values, axis=0))
+
+        # Build df for summary statistics for each quadrant
+        for quadrant in ["lp", "lm", "um", "up"]:
+            shaps_n_splits_quadrant = pd.DataFrame(shaps_n_splits.get(quadrant)).T
+            shaps_to_summary(
+                shaps_n_splits_quadrant,
+                feature_names,
+                output_dir=shap_dir,
+                filename=f"shap_{model_name}_{quadrant}",
+                plot_top_n_shap=plot_top_n_shap,
+            )
+
+        # Single csv for all predictions
+        shaps_n_splits_all = pd.DataFrame(shaps_n_splits.get("all")).T
+        shaps_to_summary(
+            shaps_n_splits_all,
+            feature_names,
+            output_dir=shap_dir,
+            filename=f"shap_{model_name}_all_predictions",
+            plot_top_n_shap=plot_top_n_shap,
+        )
+    save_obj(indexes_all, shap_dir + "indexes_quadrant.pkl")
+    return
 
 def gen_report(
     results, prefix, metrics, gen_shap=True, output_dir="./", plot_top_n_shap=16
@@ -214,4 +308,14 @@ def gen_report(
 
     # create SHAP summary csv and figures
     if gen_shap:
-        gen_report_shap(results, output_dir=output_dir, plot_top_n_shap=plot_top_n_shap)
+        reg_metrics=["explained_variance_score","max_error",
+            "mean_absolute_error","mean_squared_error",
+            "mean_squared_log_error","median_absolute_error",
+            "r2_score","mean_poisson_deviance",
+            "mean_gamma_deviance"
+            ]
+        if any([True for x in metrics if x in reg_metrics]):
+            gen_report_shap_regres(results, output_dir=output_dir, plot_top_n_shap=plot_top_n_shap)
+        else:
+            gen_report_shap_class(results, output_dir=output_dir, plot_top_n_shap=plot_top_n_shap)
+

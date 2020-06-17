@@ -29,7 +29,7 @@ pip install pydra-ml
 
 This repo installs `pydraml` a CLI to allow usage without any programming.
 
-To test the CLI for a classification example, copy the `pydra_ml/tests/data/breast_cancer.csv` and
+To test the CLI for a classification example, copy the `pydra_ml/tests/data/breast_cancer.csv` and 
 `short-spec.json.sample` to a folder and run.
 
 ```

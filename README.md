@@ -29,16 +29,22 @@ pip install pydra-ml
 
 This repo installs `pydraml` a CLI to allow usage without any programming.
 
-To test the CLI copy the `pydra_ml/tests/data/breast_cancer.csv` and
+To test the CLI for a classification example, copy the `pydra_ml/tests/data/breast_cancer.csv` and 
 `short-spec.json.sample` to a folder and run.
 
 ```
 $ pydraml -s short-spec.json.sample
 ```
+To check a regression example, copy `pydra_ml/tests/data/diabetes_table.csv` and `diabetes_spec.json`
+to a folder and run.
 
-This will generate a `test-{metric}-{timestamp}.png` file for each metric in the
-local folder together with a pickled results file containing all the scores from
-the model evaluations.
+```
+$ pydraml -s diabetes_spec.json
+```
+
+For each case pydra-ml will generate a result folder with the spec file name that includes
+`test-{metric}-{timestamp}.png` file for each metric together with a pickled results file 
+containing all the scores from the model evaluations.
 
 ```
 $ pydraml --help

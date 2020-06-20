@@ -164,6 +164,11 @@ Each model contains:
         to true.
 - One figure per metric with performance distribution across splits (with or
 without null distribution trained on permuted labels)
+- One figure per any metric with the word `score` in it reporting the results of
+a Wilcoxon signed rank test. The figure reports one-sided stats values as the
+color of each cell and the corresponding `-log10(pvalue)` as the annotation.
+Higher numbers indicate stronger effect (color) and lower p-values (annotation).
+The actual numeric values are stored in a correspondingly named pkl file.
 - `shap-{timestamp}` dir
     - SHAP values are computed for each prediction in each split's test set
     (e.g., 30 bootstrapping splits with 100 prediction will create (30,100) array).

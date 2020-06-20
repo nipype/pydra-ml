@@ -358,6 +358,10 @@ def gen_report(
             )
             ax.xaxis.set_ticks_position("top")
             plt.savefig(f"stats-{name}-{timestamp}.png")
+            save_obj(
+                dict(effects=effects, pvalues=pvalues, order=order),
+                f"stats-{name}-{timestamp}.pkl",
+            )
 
     # create SHAP summary csv and figures
     if gen_shap:

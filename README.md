@@ -29,22 +29,22 @@ pip install pydra-ml
 
 This repo installs `pydraml` a CLI to allow usage without any programming.
 
-To test the CLI for a classification example, copy the `pydra_ml/tests/data/breast_cancer.csv` and 
+To test the CLI for a classification example, copy the `pydra_ml/tests/data/breast_cancer.csv` and
 `short-spec.json.sample` to a folder and run.
 
 ```
 $ pydraml -s short-spec.json.sample
 ```
-To check a regression example, copy `pydra_ml/tests/data/diabetes_table.csv` and `diabetes_spec.json`
-to a folder and run.
+To check a regression example, copy `pydra_ml/tests/data/diabetes_table.csv` and
+`diabetes_spec.json` to a folder and run.
 
 ```
 $ pydraml -s diabetes_spec.json
 ```
 
-For each case pydra-ml will generate a result folder with the spec file name that includes
-`test-{metric}-{timestamp}.png` file for each metric together with a pickled results file 
-containing all the scores from the model evaluations.
+For each case pydra-ml will generate a result folder with the spec file name that
+includes `test-{metric}-{timestamp}.png` file for each metric together with a
+pickled results file containing all the scores from the model evaluations.
 
 ```
 $ pydraml --help
@@ -82,6 +82,7 @@ will want to generate `x_indices` programmatically.
   group.
 - *x_indices*: Numeric (0-based) or string list of columns to use as input features
 - *target_vars*: String list of target variable (at present only one is supported)
+- *group_var*: String to indicate column to use for grouping
 - *n_splits*: Number of shuffle split iterations to use
 - *test_size*: Fraction of data to use for test set in each iteration
 - *clf_info*: List of scikit-learn classifiers to use.
@@ -89,7 +90,9 @@ will want to generate `x_indices` programmatically.
 - *gen_shap*: Boolean indicating whether shap values are generated
 - *nsamples*: Number of samples to use for shap estimation
 - *l1_reg*: Type of regularizer to use for shap estimation
-- *plot_top_n_shap*: Number or proportion of top SHAP values to plot (e.g., 16 or 0.1 for top 10%). Set to 1.0 (float) to plot all features or 1 (int) to plot top first feature.
+- *plot_top_n_shap*: Number or proportion of top SHAP values to plot (e.g., 16
+or 0.1 for top 10%). Set to 1.0 (float) to plot all features or 1 (int) to plot
+top first feature.
 - *metrics*: scikit-learn metric to use
 
 ## `clf_info` specification
@@ -113,6 +116,7 @@ then an empty dictionary **MUST** be provided as parameter 3.
  "x_indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
  18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29],
  "target_vars": ["target"],
+ "group_var": null,
  "n_splits": 100,
  "test_size": 0.2,
  "clf_info": [
@@ -140,25 +144,46 @@ then an empty dictionary **MUST** be provided as parameter 3.
 
 ## Output:
 The workflow will output:
-- `results-{timestamp}.pkl` containing 1 list per model used. For example, if assigned to variable `results`, it is accessed through `results[0]` to `results[N]`
-(if `permute: [false,true]` then it will output the model trained on the labels first `results[0]` and the model trained on permuted labels second `results[1]`.
+- `results-{timestamp}.pkl` containing 1 list per model used. For example, if
+assigned to variable `results`, it is accessed through `results[0]` to `results[N]`
+(if `permute: [false,true]` then it will output the model trained on the labels
+first `results[0]` and the model trained on permuted labels second `results[1]`.
 Each model contains:
-    - `dict` accesed through `results[0][0]` with model information: `{'ml_wf.clf_info': ['sklearn.neural_network', 'MLPClassifier', {'alpha': 1, 'max_iter': 1000}], 'ml_wf.permute': False}`
-    - `pydra Result obj` accesed through `results[0][1]` with attribute `output` which itself has attributes:
+    - `dict` accesed through `results[0][0]` with model information:
+     `{'ml_wf.clf_info': ['sklearn.neural_network', 'MLPClassifier',
+         {'alpha': 1, 'max_iter': 1000}], 'ml_wf.permute': False}`
+    - `pydra Result obj` accesed through `results[0][1]` with attribute `output`
+      which itself has attributes:
         - `feature_names`: from the columns of the data csv.
         And the following attributes organized in N lists for N bootstrapping samples:
         - `output`: N lists, each one with two lists for true and predicted labels.
         - `score`: N lists each one containing M different metric scores.
-        - `shaps`: N lists each one with a list of shape (P,F) where P is the amount of predictions and F the different SHAP values for each feature. `shaps` is empty if `gen_shap` is set to `false` or if `permute` is set to true.
-- One figure per metric with performance distribution across splits (with or without null distribution trained on permuted labels)
+        - `shaps`: N lists each one with a list of shape (P,F) where P is the
+        amount of predictions and F the different SHAP values for each feature.
+        `shaps` is empty if `gen_shap` is set to `false` or if `permute` is set
+        to true.
+- One figure per metric with performance distribution across splits (with or
+without null distribution trained on permuted labels)
 - `shap-{timestamp}` dir
     - SHAP values are computed for each prediction in each split's test set
-    (e.g., 30 bootstrapping splits with 100 prediction will create (30,100) array). The mean is taken across predictions for each split (e.g., resulting in a (64,30) array for 64 features and 30 bootstrapping samples).
-    - For binary classification, a more accurate display of feature importance obtained by splitting predictions into TP, TN, FP, and FN,
-    which in turn can allow for error auditing (i.e., what a model pays attention to when making incorrect/false predictions)
-        - `quadrant_indexes.pkl`: The TP, TN, FP, FN indexes are saved in  as a `dict` with one `key` per model (permuted models without SHAP values will be skipped automatically), and each key `values` being a bootstrapping split.
-        - `summary_values_shap_{model_name}_{prediction_type}.csv` contains all SHAP values and summary statistics ranked by the mean SHAP value across bootstrapping splits. A sample_n column can be empty or NaN if this split did not have the type of prediction in the filename (e.g., you may not have FNs or FPs in a given split with high performance).
-        - `summary_shap_{model_name}_{plot_top_n_shap}.png` contains SHAP value summary statistics for all features (set to 1.0) or only the top N most important features for better visualization.
+    (e.g., 30 bootstrapping splits with 100 prediction will create (30,100) array).
+     The mean is taken across predictions for each split (e.g., resulting in a
+     (64,30) array for 64 features and 30 bootstrapping samples).
+    - For binary classification, a more accurate display of feature importance
+    obtained by splitting predictions into TP, TN, FP, and FN, which in turn can
+    allow for error auditing (i.e., what a model pays attention to when making
+    incorrect/false predictions)
+        - `quadrant_indexes.pkl`: The TP, TN, FP, FN indexes are saved in  as a
+        `dict` with one `key` per model (permuted models without SHAP values will
+        be skipped automatically), and each key `values` being a bootstrapping split.
+        - `summary_values_shap_{model_name}_{prediction_type}.csv` contains all
+        SHAP values and summary statistics ranked by the mean SHAP value across
+        bootstrapping splits. A sample_n column can be empty or NaN if this split
+        did not have the type of prediction in the filename (e.g., you may not
+        have FNs or FPs in a given split with high performance).
+        - `summary_shap_{model_name}_{plot_top_n_shap}.png` contains SHAP value
+        summary statistics for all features (set to 1.0) or only the top N most
+        important features for better visualization.
 
 
 ## Developer installation
@@ -171,10 +196,14 @@ cd pydra-ml
 pip install -e .[dev]
 ```
 
-It is also useful to install pre-commit:
+It is also useful to install pre-commit, which takes care of styling when
+committing code. When pre-commit is used you may have to run git commit twice,
+since pre-commit may make additional changes to your code for styling and will
+not commit these changes by default:
+
 ```
 pip install pre-commit
-pre-commit
+pre-commit install
 ```
 
 ### Project structure

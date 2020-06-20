@@ -55,6 +55,7 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
             filename=wf.lzin.filename,
             x_indices=wf.lzin.x_indices,
             target_vars=wf.lzin.target_vars,
+            group=wf.lzin.group_var,
         )
     )
     wf.add(

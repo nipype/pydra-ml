@@ -4,7 +4,8 @@ import os
 import pickle
 import pandas as pd
 import numpy as np
-from sklearn.metrics import accuracy_score, explained_variance_score
+from sklearn.metrics import explained_variance_score
+from scipy.stats import wilcoxon
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -42,7 +43,6 @@ def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap
     plt.tight_layout()
     plt.show(block=False)
     plt.savefig(output_dir + f"summary_{filename}.png", dpi=100)
-    return
 
 
 def shaps_to_summary(
@@ -73,7 +73,6 @@ def shaps_to_summary(
         filename=filename,
         plot_top_n_shap=plot_top_n_shap,
     )
-    return
 
 
 def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
@@ -112,7 +111,7 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
             shaps_i = shaps[split_i]  # all shap values for this bootstrapping split
             y_true = y_true_and_preds[split_i][0]
             y_pred = y_true_and_preds[split_i][1]
-            #split_performance = accuracy_score(y_true, y_pred)
+            # split_performance = accuracy_score(y_true, y_pred)
             split_performance = explained_variance_score(y_true, y_pred)
 
             # split prediction indexes into TP, TN, FP, FN, good for error auditing
@@ -166,7 +165,7 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
             plot_top_n_shap=plot_top_n_shap,
         )
     save_obj(indexes_all, shap_dir + "indexes_quadrant.pkl")
-    return
+
 
 def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
     # Create shap_dir
@@ -197,7 +196,7 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
             "lp": [],
             "lm": [],
             "um": [],
-            "up": []   
+            "up": [],
         }  # this is key with shape (F, N) where F is feature_names, N is mean shap values across splits
         # Obtain values for each bootstrapping split, then append summary statistics to shaps_n_splits
         for split_i in range(n_splits):
@@ -208,8 +207,8 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
 
             # split prediction indexes into upper, median, lower, good for error auditing
             indexes = {"lp": [], "lm": [], "um": [], "up": []}
-            q=np.array([25,50,75])
-            prc=np.percentile(y_true,q)
+            q = np.array([25, 50, 75])
+            prc = np.percentile(y_true, q)
             for i in range(len(y_true)):
                 if prc[0] >= y_pred[i]:
                     indexes["lp"].append(i)
@@ -259,7 +258,45 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
             plot_top_n_shap=plot_top_n_shap,
         )
     save_obj(indexes_all, shap_dir + "indexes_quadrant.pkl")
-    return
+
+
+def compute_pairwise_stats(df):
+    """Run Wilcoxon signed rank tests across pairs of classifiers.
+
+    When comparing a classifier to itself, compare to its null distribution.
+    A one sided test is used.
+
+    Assumes that the dataframe has three keys: Classifier, type, and score
+    with type referring to either the data distribution or the null distribution
+
+    """
+    N = len(df.Classifier.unique())
+    effects = np.zeros((N, N)) * np.nan
+    pvalues = np.zeros((N, N)) * np.nan
+    for idx1, group1 in enumerate(df.groupby("Classifier")):
+        filter = group1[1].apply(lambda x: x.type == "data", axis=1).values
+        group1df = group1[1].iloc[filter, :]
+        filter = group1[1].apply(lambda x: x.type == "null", axis=1).values
+        group1nulldf = group1[1].iloc[filter, :]
+        for idx2, group2 in enumerate(df.groupby("Classifier")):
+            filter = group2[1].apply(lambda x: x.type == "data", axis=1).values
+            group2df = group2[1].iloc[filter, :]
+            if group1[0] != group2[0]:
+                stat, pval = wilcoxon(
+                    group1df["score"].values,
+                    group2df["score"].values,
+                    alternative="greater",
+                )
+            else:
+                stat, pval = wilcoxon(
+                    group1df["score"].values,
+                    group1nulldf["score"].values,
+                    alternative="greater",
+                )
+            effects[idx1, idx2] = stat
+            pvalues[idx1, idx2] = pval
+    return effects, pvalues
+
 
 def gen_report(
     results, prefix, metrics, gen_shap=True, output_dir="./", plot_top_n_shap=16
@@ -284,6 +321,7 @@ def gen_report(
                     },
                     ignore_index=True,
                 )
+    order = [group[0] for group in df.groupby("Classifier")]
     for name, subdf in df.groupby("metric"):
         sns.set(style="whitegrid", palette="pastel", color_codes=True)
         sns.set_context("talk")
@@ -296,7 +334,7 @@ def gen_report(
             split=True,
             inner="quartile",
             hue_order=["data", "null"],
-            order=[group[0] for group in df.groupby("Classifier")],
+            order=order,
         )
         ax.set_ylabel(name)
         sns.despine(left=True)
@@ -306,16 +344,39 @@ def gen_report(
         timestamp = timestamp.replace(":", "").replace("-", "")
         plt.savefig(f"test-{name}-{timestamp}.png")
 
+        # Create comparison stats table if the metric is a score
+        if "score" in name:
+            effects, pvalues, = compute_pairwise_stats(subdf)
+            plt.figure(figsize=(8, 8))
+            ax = sns.heatmap(
+                effects,
+                annot=np.fix(-np.log10(pvalues)),
+                yticklabels=order,
+                xticklabels=order,
+                cbar=True,
+                square=True,
+            )
+            ax.xaxis.set_ticks_position("top")
+            plt.savefig(f"stats-{name}-{timestamp}.png")
+
     # create SHAP summary csv and figures
     if gen_shap:
-        reg_metrics=["explained_variance_score","max_error",
-            "mean_absolute_error","mean_squared_error",
-            "mean_squared_log_error","median_absolute_error",
-            "r2_score","mean_poisson_deviance",
-            "mean_gamma_deviance"
-            ]
+        reg_metrics = [
+            "explained_variance_score",
+            "max_error",
+            "mean_absolute_error",
+            "mean_squared_error",
+            "mean_squared_log_error",
+            "median_absolute_error",
+            "r2_score",
+            "mean_poisson_deviance",
+            "mean_gamma_deviance",
+        ]
         if any([True for x in metrics if x in reg_metrics]):
-            gen_report_shap_regres(results, output_dir=output_dir, plot_top_n_shap=plot_top_n_shap)
+            gen_report_shap_regres(
+                results, output_dir=output_dir, plot_top_n_shap=plot_top_n_shap
+            )
         else:
-            gen_report_shap_class(results, output_dir=output_dir, plot_top_n_shap=plot_top_n_shap)
-
+            gen_report_shap_class(
+                results, output_dir=output_dir, plot_top_n_shap=plot_top_n_shap
+            )

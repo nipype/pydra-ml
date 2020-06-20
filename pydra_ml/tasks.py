@@ -23,7 +23,7 @@ def read_file(filename, x_indices=None, target_vars=None, group=None):
     if group is None:
         groups = list(range(X.shape[0]))
     else:
-        groups = data[:, [group]]
+        groups = data[group].values
     feature_names = list(X.columns)
     return X.values, Y.values, groups, feature_names
 

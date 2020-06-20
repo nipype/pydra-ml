@@ -1,6 +1,7 @@
-{"filename": "./diabetes_table.csv",
+{"filename": "diabetes_table.csv",
  "x_indices": [0,1,2,3,4,5,6,7,8,9],
  "target_vars": ["target"],
+ "group_var": null,
  "n_splits": 4,
  "test_size": 0.2,
  "clf_info": [

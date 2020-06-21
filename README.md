@@ -213,6 +213,6 @@ pre-commit install
 
 ### Project structure
 
-- `tasks.py` contain the annotated Pydra tasks.
-- `classifier.py` contains the Pydra workflow.
+- `tasks.py` contain the Python functions.
+- `classifier.py` contains the Pydra workflow and the annotated tasks.
 - `report.py` contains report generation code.

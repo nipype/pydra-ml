@@ -336,28 +336,44 @@ def gen_report(
             hue_order=["data", "null"],
             order=order,
         )
+        ax.xaxis.set_ticks_position("top")
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="center")
         ax.set_ylabel(name)
+        ax.legend(loc="center right", bbox_to_anchor=(1.2, 0.5), ncol=1)
+        ax.tick_params(axis="both", which="both", length=0)
         sns.despine(left=True)
+        plt.tight_layout()
+
         import datetime
 
         timestamp = datetime.datetime.utcnow().isoformat()
         timestamp = timestamp.replace(":", "").replace("-", "")
         plt.savefig(f"test-{name}-{timestamp}.png")
+        plt.close()
 
         # Create comparison stats table if the metric is a score
         if "score" in name:
             effects, pvalues, = compute_pairwise_stats(subdf)
-            plt.figure(figsize=(8, 8))
+            sns.set(style="whitegrid", palette="pastel", color_codes=True)
+            sns.set_context("talk")
+            plt.figure(figsize=(2 * len(order), 2 * len(order)))
+            # plt.figure(figsize=(8, 8))
             ax = sns.heatmap(
                 effects,
                 annot=np.fix(-np.log10(pvalues)),
                 yticklabels=order,
                 xticklabels=order,
                 cbar=True,
+                cbar_kws={"shrink": 0.7},
                 square=True,
             )
             ax.xaxis.set_ticks_position("top")
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="center")
+            ax.set_yticklabels(ax.get_yticklabels(), rotation=0, ha="right")
+            ax.tick_params(axis="both", which="both", length=0)
+            plt.tight_layout()
             plt.savefig(f"stats-{name}-{timestamp}.png")
+            plt.close()
             save_obj(
                 dict(effects=effects, pvalues=pvalues, order=order),
                 f"stats-{name}-{timestamp}.pkl",

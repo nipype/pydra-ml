@@ -336,8 +336,12 @@ def gen_report(
             hue_order=["data", "null"],
             order=order,
         )
+        ax.xaxis.set_ticks_position("top")
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="center")
         ax.set_ylabel(name)
         sns.despine(left=True)
+        plt.tight_layout()
+
         import datetime
 
         timestamp = datetime.datetime.utcnow().isoformat()
@@ -348,6 +352,8 @@ def gen_report(
         if "score" in name:
             effects, pvalues, = compute_pairwise_stats(subdf)
             plt.close()
+            sns.set(style="whitegrid", palette="pastel", color_codes=True)
+            sns.set_context("talk")
             # plt.figure(figsize=(8, 8))
             ax = sns.heatmap(
                 effects,
@@ -358,7 +364,7 @@ def gen_report(
                 square=True,
             )
             ax.xaxis.set_ticks_position("top")
-            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="left")
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="center")
             ax.set_yticklabels(ax.get_yticklabels(), rotation=0, ha="right")
             plt.tight_layout()
             plt.savefig(f"stats-{name}-{timestamp}.png")

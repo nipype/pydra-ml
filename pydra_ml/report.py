@@ -340,6 +340,7 @@ def gen_report(
         ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="center")
         ax.set_ylabel(name)
         ax.legend(loc="center right", bbox_to_anchor=(1.2, 0.5), ncol=1)
+        ax.tick_params(axis="both", which="both", length=0)
         sns.despine(left=True)
         plt.tight_layout()
 
@@ -369,6 +370,7 @@ def gen_report(
             ax.xaxis.set_ticks_position("top")
             ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="center")
             ax.set_yticklabels(ax.get_yticklabels(), rotation=0, ha="right")
+            ax.tick_params(axis="both", which="both", length=0)
             plt.tight_layout()
             plt.savefig(f"stats-{name}-{timestamp}.png")
             plt.close()

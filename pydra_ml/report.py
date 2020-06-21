@@ -358,6 +358,9 @@ def gen_report(
                 square=True,
             )
             ax.xaxis.set_ticks_position("top")
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="left")
+            ax.set_yticklabels(ax.get_yticklabels(), rotation=0, ha="right")
+            plt.tight_layout()
             plt.savefig(f"stats-{name}-{timestamp}.png")
             save_obj(
                 dict(effects=effects, pvalues=pvalues, order=order),

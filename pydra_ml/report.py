@@ -347,6 +347,7 @@ def gen_report(
         # Create comparison stats table if the metric is a score
         if "score" in name:
             effects, pvalues, = compute_pairwise_stats(subdf)
+            plt.close()
             # plt.figure(figsize=(8, 8))
             ax = sns.heatmap(
                 effects,

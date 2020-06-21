@@ -347,13 +347,14 @@ def gen_report(
         timestamp = datetime.datetime.utcnow().isoformat()
         timestamp = timestamp.replace(":", "").replace("-", "")
         plt.savefig(f"test-{name}-{timestamp}.png")
+        plt.close()
 
         # Create comparison stats table if the metric is a score
         if "score" in name:
             effects, pvalues, = compute_pairwise_stats(subdf)
-            plt.close()
             sns.set(style="whitegrid", palette="pastel", color_codes=True)
             sns.set_context("talk")
+            plt.figure(figsize=(2 * len(order), 2 * len(order)))
             # plt.figure(figsize=(8, 8))
             ax = sns.heatmap(
                 effects,
@@ -368,6 +369,7 @@ def gen_report(
             ax.set_yticklabels(ax.get_yticklabels(), rotation=0, ha="right")
             plt.tight_layout()
             plt.savefig(f"stats-{name}-{timestamp}.png")
+            plt.close()
             save_obj(
                 dict(effects=effects, pvalues=pvalues, order=order),
                 f"stats-{name}-{timestamp}.pkl",

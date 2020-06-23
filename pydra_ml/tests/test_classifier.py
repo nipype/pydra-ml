@@ -5,7 +5,11 @@ from ..classifier import gen_workflow, run_workflow
 def test_classifier(tmpdir):
     clfs = [
         ("sklearn.neural_network", "MLPClassifier", {"alpha": 1, "max_iter": 1000}),
-        ("sklearn.naive_bayes", "GaussianNB", {}),
+        [
+            ["sklearn.impute", "SimpleImputer"],
+            ["sklearn.preprocessing", "StandardScaler"],
+            ["sklearn.naive_bayes", "GaussianNB", {}],
+        ],
     ]
     csv_file = os.path.join(os.path.dirname(__file__), "data", "breast_cancer.csv")
     inputs = {
@@ -32,7 +36,11 @@ def test_classifier(tmpdir):
 
 def test_regressor(tmpdir):
     clfs = [
-        ("sklearn.neural_network", "MLPRegressor", {"alpha": 1, "max_iter": 1000}),
+        [
+            ["sklearn.impute", "SimpleImputer"],
+            ["sklearn.preprocessing", "StandardScaler"],
+            ["sklearn.neural_network", "MLPRegressor", {"alpha": 1, "max_iter": 1000}],
+        ],
         (
             "sklearn.linear_model",
             "LinearRegression",

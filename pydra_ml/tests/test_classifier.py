@@ -66,6 +66,6 @@ def test_regressor(tmpdir):
 
     wf = gen_workflow(inputs, cache_dir=tmpdir)
     results = run_workflow(wf, "cf", {"n_procs": 1})
-    assert results[0][0]["ml_wf.clf_info"][1] == "MLPRegressor"
+    assert results[0][0]["ml_wf.clf_info"][-1][1] == "MLPRegressor"
     assert results[0][0]["ml_wf.permute"]
     assert results[0][1].output.score[0][0] < results[1][1].output.score[0][0]

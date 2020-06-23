@@ -8,7 +8,9 @@
  "clf_info": [
  ["sklearn.ensemble", "AdaBoostClassifier"],
  ["sklearn.naive_bayes", "GaussianNB"],
- ["sklearn.tree", "DecisionTreeClassifier", {"max_depth": 5}],
+ [ ["sklearn.impute", "SimpleImputer"],
+   ["sklearn.preprocessing", "StandardScaler"],
+   ["sklearn.tree", "DecisionTreeClassifier", {"max_depth": 5}]],
  ["sklearn.ensemble", "RandomForestClassifier", {"n_estimators": 100}],
  ["sklearn.ensemble", "ExtraTreesClassifier", {"n_estimators": 100, "class_weight": "balanced"}],
  ["sklearn.linear_model", "LogisticRegressionCV", {"solver": "liblinear", "penalty": "l1"}],

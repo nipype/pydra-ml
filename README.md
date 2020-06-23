@@ -11,11 +11,10 @@ scale across a set of classifiers and metrics. It will also use Pydra's caching
 to not redo model training and evaluation when new metrics are added, or when
 number of iterations (`n_splits`) is increased.
 
-Upcoming features:
-1. Improve output report containing [SHAP](https://github.com/slundberg/shap)
+1. Output report contains [SHAP](https://github.com/slundberg/shap)
   feature analysis.
-2. Allow for comparing scikit-learn pipelines.
-3. Test on scikit-learn compatible classifiers
+2. Allows for comparing *some* scikit-learn pipelines in addition to base
+  classifiers.
 
 ### Installation
 
@@ -109,6 +108,16 @@ This is a list of classifiers from scikit learn and uses an array to encode:
 when param grid is provided and default classifier parameters are not changed,
 then an empty dictionary **MUST** be provided as parameter 3.
 
+This can also be embedded as a list indicating a scikit-learn Pipeline. For
+example:
+
+```
+ [ ["sklearn.impute", "SimpleImputer"],
+   ["sklearn.preprocessing", "StandardScaler"],
+   ["sklearn.tree", "DecisionTreeClassifier", {"max_depth": 5}]
+  ]
+```
+
 ## Example specification:
 
 ```
@@ -121,17 +130,17 @@ then an empty dictionary **MUST** be provided as parameter 3.
  "test_size": 0.2,
  "clf_info": [
  ["sklearn.ensemble", "AdaBoostClassifier"],
- ["sklearn.naive_bayes", "GaussianNB"],
  ["sklearn.tree", "DecisionTreeClassifier", {"max_depth": 5}],
- ["sklearn.ensemble", "RandomForestClassifier", {"n_estimators": 100}],
- ["sklearn.ensemble", "ExtraTreesClassifier", {"n_estimators": 100, "class_weight": "balanced"}],
- ["sklearn.linear_model", "LogisticRegressionCV", {"solver": "liblinear", "penalty": "l1"}],
  ["sklearn.neural_network", "MLPClassifier", {"alpha": 1, "max_iter": 1000}],
  ["sklearn.svm", "SVC", {"probability": true},
   [{"kernel": ["rbf", "linear"], "C": [1, 10, 100, 1000]}]],
  ["sklearn.neighbors", "KNeighborsClassifier", {},
   [{"n_neighbors": [3, 5, 7, 9, 11, 13, 15, 17, 19],
-    "weights": ["uniform", "distance"]}]]
+    "weights": ["uniform", "distance"]}]],
+ [ ["sklearn.impute", "SimpleImputer"],
+   ["sklearn.preprocessing", "StandardScaler"],
+   ["sklearn.tree", "DecisionTreeClassifier", {"max_depth": 5}]
+  ]
  ],
  "permute": [true, false],
  "gen_shap": true,

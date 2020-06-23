@@ -62,21 +62,35 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
     :param permute: whether to run it in permuted mode or not
     :return: outputs, trained classifier with sample indices
     """
-    from sklearn.preprocessing import StandardScaler
     from sklearn.pipeline import Pipeline
     import numpy as np
 
-    mod = __import__(clf_info[0], fromlist=[clf_info[1]])
-    params = {}
-    if len(clf_info) > 2:
-        params = clf_info[2]
-    clf = getattr(mod, clf_info[1])(**params)
-    if len(clf_info) == 4:
-        from sklearn.model_selection import GridSearchCV
+    def to_instance(clf_info):
+        mod = __import__(clf_info[0], fromlist=[clf_info[1]])
+        params = {}
+        if len(clf_info) > 2:
+            params = clf_info[2]
+        clf = getattr(mod, clf_info[1])(**params)
+        if len(clf_info) == 4:
+            from sklearn.model_selection import GridSearchCV
 
-        clf = GridSearchCV(clf, param_grid=clf_info[3])
+            clf = GridSearchCV(clf, param_grid=clf_info[3])
+        return clf
+
+    if isinstance(clf_info[0], list):
+        # Process as a pipeline constructor
+        steps = []
+        for val in clf_info:
+            step = to_instance(val)
+            steps.append((val[1], step))
+        pipe = Pipeline(steps)
+    else:
+        clf = to_instance(clf_info)
+        from sklearn.preprocessing import StandardScaler
+
+        pipe = Pipeline([("std", StandardScaler()), (clf_info[1], clf)])
+
     train_index, test_index = train_test_split[split_index]
-    pipe = Pipeline([("std", StandardScaler()), (clf_info[1], clf)])
     y = y.ravel()
     if permute:
         pipe.fit(X[train_index], y[np.random.permutation(train_index)])

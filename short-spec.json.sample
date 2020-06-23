@@ -7,7 +7,10 @@
  "test_size": 0.2,
  "clf_info": [
   ["sklearn.neural_network", "MLPClassifier", {"alpha": 1, "max_iter": 1000}],
-  ["sklearn.tree", "DecisionTreeClassifier", {"max_depth": 5}]
+  [ ["sklearn.impute", "SimpleImputer"],
+    ["sklearn.preprocessing", "StandardScaler"],
+    ["sklearn.tree", "DecisionTreeClassifier", {"max_depth": 5}]
+  ]
  ],
  "permute": [false, true],
  "gen_shap": true,

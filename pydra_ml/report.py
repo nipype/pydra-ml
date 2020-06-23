@@ -87,7 +87,10 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
     indexes_all = {}
 
     for model_results in results:
-        model_name = model_results[0].get("ml_wf.clf_info")[1]
+        model_name = model_results[0].get("ml_wf.clf_info")
+        if isinstance(model_name[0], list):
+            model_name = model_name[-1]
+        model_name = model_name[1]
         indexes_all[model_name] = []
         shaps = model_results[
             1
@@ -179,7 +182,10 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
     indexes_all = {}
 
     for model_results in results:
-        model_name = model_results[0].get("ml_wf.clf_info")[1]
+        model_name = model_results[0].get("ml_wf.clf_info")
+        if isinstance(model_name[0], list):
+            model_name = model_name[-1]
+        model_name = model_name[1]
         indexes_all[model_name] = []
         shaps = model_results[
             1
@@ -308,7 +314,17 @@ def gen_report(
         score = val[1].output.score
         if not isinstance(score, list):
             score = [score]
-        name = val[0][prefix + ".clf_info"][1].split("Classifier")[0]
+
+        clf = val[0][prefix + ".clf_info"]
+        if isinstance(clf[0], list):
+            clf = clf[-1][1]
+        else:
+            clf = clf[1]
+        if "Classifier" in clf:
+            name = clf.split("Classifier")[0]
+        else:
+            name = clf.split("Regressor")[0]
+        name = name.split("CV")[0]
         permute = val[0][prefix + ".permute"]
         for scoreval in score:
             for idx, metric in enumerate(metrics):

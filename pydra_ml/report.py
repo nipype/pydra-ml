@@ -40,9 +40,8 @@ def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap
     hm.set_xticklabels(summary.columns, rotation=45)
     hm.set_yticklabels(summary.index, rotation=0)
     plt.ylabel("Features")
-    plt.tight_layout()
     plt.show(block=False)
-    plt.savefig(output_dir + f"summary_{filename}.png", dpi=100)
+    plt.savefig(output_dir + f"summary_{filename}.png", dpi=100, bbox_inches='tight')
 
 
 def shaps_to_summary(

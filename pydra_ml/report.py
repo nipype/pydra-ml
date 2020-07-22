@@ -35,7 +35,7 @@ def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap
         filename += f"_top_{plot_top_n_shap}"
 
     hm = sns.heatmap(
-        summary.round(3), annot=True, xticklabels=True, yticklabels=True, cbar=False
+        summary.round(3), annot=True, xticklabels=True, yticklabels=True, cbar=False, square=True,
     )
     hm.set_xticklabels(summary.columns, rotation=45)
     hm.set_yticklabels(summary.index, rotation=0)

@@ -155,8 +155,8 @@ example:
 The workflow will output:
 - `results-{timestamp}.pkl` containing 1 list per model used. For example, if
 assigned to variable `results`, it is accessed through `results[0]` to `results[N]`
-(if `permute: [false,true]` then it will output the model trained on the labels
-first `results[0]` and the model trained on permuted labels second `results[1]`.
+(e.g., if `permute: [true,false]` then it will output the model trained on permuted labels first `results[0]` and the model trained on the labels
+second `results[1]`. If there is an additional model, these will be accesed through `results[2]` and `results[3]`).
 Each model contains:
     - `dict` accesed through `results[0][0]` with model information:
      `{'ml_wf.clf_info': ['sklearn.neural_network', 'MLPClassifier',

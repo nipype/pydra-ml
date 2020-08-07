@@ -1,4 +1,4 @@
-![Python package](https://github.com/nipype/pydra-ml/workflows/Python%20package/badge.svg?branch=master)
+[![Python package](https://github.com/nipype/pydra-ml/workflows/Python%20package/badge.svg?branch=master)](https://github.com/nipype/pydra-ml/actions?query=workflow%3A%22Python+package%22)
 
 # pydra-ml
 

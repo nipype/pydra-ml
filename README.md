@@ -199,6 +199,12 @@ The actual numeric values are stored in a correspondingly named pkl file.
         summary statistics for all features (set to 1.0) or only the top N most
         important features for better visualization.
 
+## Debugging
+
+You will need to understand a bit of pydra to know how to debug this application for
+now. If the process crashes, the easiest way to restart is to remove the `cache-wf` 
+folder first. However, if you are rerunning, you could also remove any `.lock` file
+in the `cache-wf`directory.
 
 ## Developer installation
 

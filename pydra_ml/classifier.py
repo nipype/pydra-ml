@@ -5,7 +5,14 @@ from pydra.mark import task, annotate
 from pydra.utils.messenger import AuditFlag, FileMessenger
 import typing as ty
 import os
-from .tasks import read_file, gen_splits, train_test_kernel, calc_metric, get_shap
+from .tasks import (
+    read_file,
+    gen_splits,
+    train_test_kernel,
+    calc_metric,
+    get_shap,
+    create_model,
+)
 from .report import gen_report
 
 # Create pydra tasks
@@ -35,6 +42,10 @@ calc_metric_pdt = task(
 )
 
 get_shap_pdt = task(annotate({"return": {"shaps": ty.Any}})(get_shap))
+
+create_model_pdt = task(
+    annotate({"return": {"output": ty.Any, "model": ty.Any}})(create_model)
+)
 
 
 def gen_workflow(inputs, cache_dir=None, cache_locations=None):
@@ -98,12 +109,22 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
         )
     )
     wf.shap.combine("fit_clf.split_index")
+    wf.add(
+        create_model_pdt(
+            name="create_model",
+            X=wf.readcsv.lzout.X,
+            y=wf.readcsv.lzout.Y,
+            clf_info=wf.lzin.clf_info,
+            permute=wf.lzin.permute,
+        )
+    )
     wf.set_output(
         [
             ("output", wf.metric.lzout.output),
             ("score", wf.metric.lzout.score),
             ("shaps", wf.shap.lzout.shaps),
             ("feature_names", wf.readcsv.lzout.feature_names),
+            ("model", wf.create_model.lzout.model),
         ]
     )
     return wf

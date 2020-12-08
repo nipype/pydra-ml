@@ -171,6 +171,19 @@ Each model contains:
         amount of predictions and F the different SHAP values for each feature.
         `shaps` is empty if `gen_shap` is set to `false` or if `permute` is set
         to true.
+        - `model`: A pickled version of the model trained on all the input data.
+        One can use this model to test on new data that has the exact same input
+        shape and features as the trained model. For example:
+        ```python
+        import pickle as pk
+        import numpy as np
+        with open("results-20201208T010313.229190.pkl", "rb") as fp:
+            data = pk.load(fp)
+        trained_model = data[0][1].output.model
+        trained_model.predict(np.random.rand(1, 30))
+        ```
+        Please check the value of `data[N][0]` to ensure that you are not using
+        a permuted model.
 - One figure per metric with performance distribution across splits (with or
 without null distribution trained on permuted labels)
 - One figure per any metric with the word `score` in it reporting the results of
@@ -202,7 +215,7 @@ The actual numeric values are stored in a correspondingly named pkl file.
 ## Debugging
 
 You will need to understand a bit of pydra to know how to debug this application for
-now. If the process crashes, the easiest way to restart is to remove the `cache-wf` 
+now. If the process crashes, the easiest way to restart is to remove the `cache-wf`
 folder first. However, if you are rerunning, you could also remove any `.lock` file
 in the `cache-wf`directory.
 

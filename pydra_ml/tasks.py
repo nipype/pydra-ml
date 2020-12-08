@@ -134,3 +134,49 @@ def get_shap(X, permute, model, gen_shap=False, nsamples="auto", l1_reg="aic"):
     explainer = shap.KernelExplainer(pipe.predict, shap.kmeans(X[train_index], 5))
     shaps = explainer.shap_values(X[test_index], nsamples=nsamples, l1_reg=l1_reg)
     return shaps
+
+
+def create_model(X, y, clf_info, permute):
+    """Train a model with all the data
+
+    :param X: Input features
+    :param y: Target variables
+    :param clf_info: how to construct the classifier
+    :param permute: whether to run it in permuted mode or not
+    :return: training error, classifier
+    """
+    from sklearn.pipeline import Pipeline
+    import numpy as np
+
+    def to_instance(clf_info):
+        mod = __import__(clf_info[0], fromlist=[clf_info[1]])
+        params = {}
+        if len(clf_info) > 2:
+            params = clf_info[2]
+        clf = getattr(mod, clf_info[1])(**params)
+        if len(clf_info) == 4:
+            from sklearn.model_selection import GridSearchCV
+
+            clf = GridSearchCV(clf, param_grid=clf_info[3])
+        return clf
+
+    if isinstance(clf_info[0], list):
+        # Process as a pipeline constructor
+        steps = []
+        for val in clf_info:
+            step = to_instance(val)
+            steps.append((val[1], step))
+        pipe = Pipeline(steps)
+    else:
+        clf = to_instance(clf_info)
+        from sklearn.preprocessing import StandardScaler
+
+        pipe = Pipeline([("std", StandardScaler()), (clf_info[1], clf)])
+
+    y = y.ravel()
+    if permute:
+        pipe.fit(X, y[np.random.permutation(range(len(y)))])
+    else:
+        pipe.fit(X, y)
+    predicted = pipe.predict(X)
+    return (y, predicted), pipe

@@ -182,6 +182,8 @@ Each model contains:
         trained_model = data[0][1].output.model
         trained_model.predict(np.random.rand(1, 30))
         ```
+        Please check the value of `data[N][0]` to ensure that you are not using
+        a permuted model.
 - One figure per metric with performance distribution across splits (with or
 without null distribution trained on permuted labels)
 - One figure per any metric with the word `score` in it reporting the results of

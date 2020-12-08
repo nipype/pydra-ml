@@ -1,5 +1,6 @@
 import os
 from ..classifier import gen_workflow, run_workflow
+import numpy as np
 
 
 def test_classifier(tmpdir):
@@ -32,6 +33,8 @@ def test_classifier(tmpdir):
     assert results[0][0]["ml_wf.clf_info"][1] == "MLPClassifier"
     assert results[0][0]["ml_wf.permute"]
     assert results[0][1].output.score[0][0] < results[1][1].output.score[0][0]
+    assert hasattr(results[2][1].output.model, "predict")
+    assert isinstance(results[2][1].output.model.predict(np.ones((1, 30))), np.ndarray)
 
 
 def test_regressor(tmpdir):
@@ -69,3 +72,5 @@ def test_regressor(tmpdir):
     assert results[0][0]["ml_wf.clf_info"][-1][1] == "MLPRegressor"
     assert results[0][0]["ml_wf.permute"]
     assert results[0][1].output.score[0][0] < results[1][1].output.score[0][0]
+    assert hasattr(results[2][1].output.model, "predict")
+    assert isinstance(results[2][1].output.model.predict(np.ones((1, 10))), np.ndarray)

@@ -15,7 +15,38 @@ def test_classifier(tmpdir):
     csv_file = os.path.join(os.path.dirname(__file__), "data", "breast_cancer.csv")
     inputs = {
         "filename": csv_file,
-        "x_indices": range(30),
+        "x_indices": [
+            "mean radius",
+            "mean texture",
+            "mean perimeter",
+            "mean area",
+            "mean smoothness",
+            "mean compactness",
+            "mean concavity",
+            "mean concave points",
+            "mean symmetry",
+            "mean fractal dimension",
+            "radius error",
+            "texture error",
+            "perimeter error",
+            "area error",
+            "smoothness error",
+            "compactness error",
+            "concavity error",
+            "concave points error",
+            "symmetry error",
+            "fractal dimension error",
+            "worst radius",
+            "worst texture",
+            "worst perimeter",
+            "worst area",
+            "worst smoothness",
+            "worst compactness",
+            "worst concavity",
+            "worst concave points",
+            "worst symmetry",
+            "worst fractal dimension",
+        ],
         "target_vars": ("target",),
         "group_var": None,
         "n_splits": 2,
@@ -28,13 +59,15 @@ def test_classifier(tmpdir):
         "plot_top_n_shap": 16,
         "metrics": ["roc_auc_score", "accuracy_score"],
     }
-    wf = gen_workflow(inputs, cache_dir=tmpdir)
+    tmpdir.chdir()
+    wf = gen_workflow(inputs, cache_dir=tmpdir / "cache")
     results = run_workflow(wf, "cf", {"n_procs": 1})
     assert results[0][0]["ml_wf.clf_info"][1] == "MLPClassifier"
     assert results[0][0]["ml_wf.permute"]
     assert results[0][1].output.score[0][0] < results[1][1].output.score[0][0]
     assert hasattr(results[2][1].output.model, "predict")
     assert isinstance(results[2][1].output.model.predict(np.ones((1, 30))), np.ndarray)
+    assert all([val[1].output.model.n_features_in_ == 30 for val in results])
 
 
 def test_regressor(tmpdir):
@@ -67,10 +100,12 @@ def test_regressor(tmpdir):
         "metrics": ["explained_variance_score"],
     }
 
-    wf = gen_workflow(inputs, cache_dir=tmpdir)
+    tmpdir.chdir()
+    wf = gen_workflow(inputs, cache_dir=tmpdir / "cache")
     results = run_workflow(wf, "cf", {"n_procs": 1})
     assert results[0][0]["ml_wf.clf_info"][-1][1] == "MLPRegressor"
     assert results[0][0]["ml_wf.permute"]
     assert results[0][1].output.score[0][0] < results[1][1].output.score[0][0]
     assert hasattr(results[2][1].output.model, "predict")
     assert isinstance(results[2][1].output.model.predict(np.ones((1, 10))), np.ndarray)
+    assert all([val[1].output.model.n_features_in_ == 10 for val in results])

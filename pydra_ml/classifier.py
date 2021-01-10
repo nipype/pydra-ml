@@ -114,6 +114,7 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
             name="create_model",
             X=wf.readcsv.lzout.X,
             y=wf.readcsv.lzout.Y,
+            feature_names=wf.readcsv.lzout.feature_names,
             clf_info=wf.lzin.clf_info,
             permute=wf.lzin.permute,
         )

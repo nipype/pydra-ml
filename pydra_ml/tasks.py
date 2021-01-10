@@ -136,11 +136,12 @@ def get_shap(X, permute, model, gen_shap=False, nsamples="auto", l1_reg="aic"):
     return shaps
 
 
-def create_model(X, y, clf_info, permute):
+def create_model(X, y, feature_names, clf_info, permute):
     """Train a model with all the data
 
     :param X: Input features
     :param y: Target variables
+    :param feature_names: List of features
     :param clf_info: how to construct the classifier
     :param permute: whether to run it in permuted mode or not
     :return: training error, classifier
@@ -173,6 +174,7 @@ def create_model(X, y, clf_info, permute):
 
         pipe = Pipeline([("std", StandardScaler()), (clf_info[1], clf)])
 
+    assert len(feature_names) == X.shape[1]
     y = y.ravel()
     if permute:
         pipe.fit(X, y[np.random.permutation(range(len(y)))])

@@ -133,10 +133,6 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
 
 def run_workflow(wf, plugin, plugin_args, specfile="localspec"):
     cwd = os.getcwd()
-    import warnings
-    from sklearn.exceptions import ConvergenceWarning
-
-    warnings.simplefilter("once", ConvergenceWarning)
     with pydra.Submitter(plugin=plugin, **plugin_args) as sub:
         sub(runnable=wf)
     results = wf.result(return_inputs=True)

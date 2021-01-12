@@ -64,6 +64,10 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
     """
     from sklearn.pipeline import Pipeline
     import numpy as np
+    import warnings
+    from sklearn.exceptions import ConvergenceWarning
+
+    warnings.simplefilter("once", ConvergenceWarning)
 
     def to_instance(clf_info):
         mod = __import__(clf_info[0], fromlist=[clf_info[1]])
@@ -148,6 +152,10 @@ def create_model(X, y, feature_names, clf_info, permute):
     """
     from sklearn.pipeline import Pipeline
     import numpy as np
+    import warnings
+    from sklearn.exceptions import ConvergenceWarning
+
+    warnings.simplefilter("once", ConvergenceWarning)
 
     def to_instance(clf_info):
         mod = __import__(clf_info[0], fromlist=[clf_info[1]])

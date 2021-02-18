@@ -21,13 +21,19 @@ from .classifier import gen_workflow, run_workflow
     show_default=True,
 )
 @click.option(
+    "--splitoutput",
+    is_flag=True,
+    help="Save outputs for every train test split.",
+    show_default=True,
+)
+@click.option(
     "-c",
     "--cache",
     default=os.path.join(os.getcwd(), "cache-wf"),
     help="Cache dir",
     show_default=True,
 )
-def main(specfile, plugin, cache):
+def main(specfile, plugin, splitoutput, cache):
     with open(specfile) as fp:
         spec = json.load(fp)
     spec["filename"] = os.path.abspath(spec["filename"])
@@ -39,6 +45,9 @@ def main(specfile, plugin, cache):
             f"({len(spec['target_vars'])} provided) is supported."
         )
     wf = gen_workflow(spec, cache_dir=cache)
+    if splitoutput:
+        wf.set_output([("split_output", wf.fit_clf.lzout.output)])
+
     plugin_args = dict()
     for item in plugin[1].split():
         key, value = item.split("=")

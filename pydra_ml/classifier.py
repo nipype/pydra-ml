@@ -10,6 +10,8 @@ from .tasks import (
     gen_splits,
     train_test_kernel,
     calc_metric,
+	get_feature_importance,
+    get_permutation_importance,
     get_shap,
     create_model,
 )
@@ -40,6 +42,10 @@ train_test_kernel_pdt = task(
 calc_metric_pdt = task(
     annotate({"return": {"score": ty.Any, "output": ty.Any}})(calc_metric)
 )
+
+get_feature_importance_pdt = task(annotate({"return": {"feature_importance": ty.Any}})(get_feature_importance))
+
+get_permutation_importance_pdt = task(annotate({"return": {"permutation_importance": ty.Any}})(get_permutation_importance))
 
 get_shap_pdt = task(annotate({"return": {"shaps": ty.Any}})(get_shap))
 
@@ -98,6 +104,28 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
     )
     wf.metric.combine("fit_clf.split_index")
     wf.add(
+	    get_feature_importance_pdt(
+		    name="feature_importance",
+		    permute=wf.lzin.permute,
+		    model=wf.fit_clf.lzout.model,
+		    gen_feature_importance=wf.lzin.gen_feature_importance
+	    )
+    )
+    wf.feature_importance.combine("fit_clf.split_index")
+    wf.add(
+	    get_permutation_importance_pdt(
+		    name="permutation_importance",
+		    X=wf.readcsv.lzout.X,
+		    y=wf.readcsv.lzout.Y,
+		    permute=wf.lzin.permute,
+		    model=wf.fit_clf.lzout.model,
+		    permutation_importance_n_repeats=wf.lzin.permutation_importance_n_repeats,
+            permutation_importance_scoring=wf.lzin.permutation_importance_scoring,
+		    gen_permutation_importance=wf.lzin.gen_permutation_importance
+	    )
+    )
+    wf.permutation_importance.combine("fit_clf.split_index")
+    wf.add(
         get_shap_pdt(
             name="shap",
             X=wf.readcsv.lzout.X,
@@ -122,6 +150,8 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
         [
             ("output", wf.metric.lzout.output),
             ("score", wf.metric.lzout.score),
+	        ("feature_importance", wf.feature_importance.lzout.feature_importance),
+	        ("permutation_importance", wf.permutation_importance.lzout.permutation_importance),
             ("shaps", wf.shap.lzout.shaps),
             ("feature_names", wf.readcsv.lzout.feature_names),
             ("model", wf.create_model.lzout.model),

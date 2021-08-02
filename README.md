@@ -312,13 +312,7 @@ without null distribution trained on permuted labels)
 You will need to understand a bit of pydra to know how to debug this application for
 now. If the process crashes, the easiest way to restart is to remove the `cache-wf`
 folder first. However, if you are rerunning, you could also remove any `.lock` file
-in the `cache-wf`directory. An example was left in the `examples/` folder:
-
-```
-python3 clear_locks.py
-```
-
-A bash script `run_clear_locks.sh` has also been included to run `clear_locks.py` using slurm.
+in the `cache-wf`directory. 
 
 ## Developer installation
 

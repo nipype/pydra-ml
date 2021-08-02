@@ -1,6 +1,8 @@
 import os
-from ..classifier import gen_workflow, run_workflow
+
 import numpy as np
+
+from ..classifier import gen_workflow, run_workflow
 
 
 def test_classifier(tmpdir):

@@ -9,18 +9,25 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: true
       matrix:
-        os: [ubuntu-20.04]
-        python-version: [3.9, 3.8, 3.7]
+        os:
+          - windows-2019
+          - ubuntu-20.04
+          - macos-latest
+        python:
+          - 3.7
+          - 3.8
+          - 3.9
 
     steps:
       - uses: actions/checkout@v2
         with:  # no need for the history
           fetch-depth: 1
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python }}
         uses: actions/setup-python@v2
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.python }}
 
       - name: Install dependencies
         run: |

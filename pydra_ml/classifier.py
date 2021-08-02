@@ -8,8 +8,14 @@ from pydra.mark import annotate, task
 from pydra.utils.messenger import AuditFlag, FileMessenger
 
 from .report import gen_report
-from .tasks import (calc_metric, create_model, gen_splits, get_shap, read_file,
-                    train_test_kernel)
+from .tasks import (
+    calc_metric,
+    create_model,
+    gen_splits,
+    get_shap,
+    read_file,
+    train_test_kernel,
+)
 
 # Create pydra tasks
 read_file_pdt = task(

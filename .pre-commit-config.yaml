@@ -24,6 +24,7 @@ repos:
     rev: 5.9.2
     hooks:
     -   id: isort
+        args: ["--profile", "black"]
         exclude: ^(pydra_ml/_version\.py|versioneer\.py)$
 -   repo: https://github.com/codespell-project/codespell
     rev: v2.1.0

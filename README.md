@@ -15,9 +15,13 @@ to:
 2. **Compare *some* scikit-learn pipelines** in addition to base
   classifiers (i.e., showing the distribution of performance of different models side-by-side).
 
-![alt text](https://github.com/danielmlow/pydra-ml/blob/master/examples/test-roc_auc_score-example.png?raw=true)
+  ![alt text](https://github.com/danielmlow/pydra-ml/blob/master/examples/test-roc_auc_score-example.png?raw=true)
+  The distribution of performance from models trained on true labels (blue) and trained on permuted labels (orange) over 50 bootstrapping splits.
 
-![alt text](https://github.com/danielmlow/pydra-ml/blob/master/examples/test_performance_with_null_roc_auc_score.png?raw=true)
+
+  ![alt text](https://github.com/danielmlow/pydra-ml/blob/master/examples/test_performance_with_null_roc_auc_score.png?raw=true)
+  Median performance across 50 bootstrapping splits (95% Confidence Interval; median performance of null model)
+
 
 3. Save models and **not redo model training and evaluation** when new metrics are added, or when
 number of iterations (`n_splits`) is increased. Just change spec file and it will use stored models to save time.
@@ -27,7 +31,10 @@ number of iterations (`n_splits`) is increased. Just change spec file and it wil
 - (2) sklearn's [permutation_importance](https://scikit-learn.org/stable/modules/generated/sklearn.inspection.permutation_importance.html) (model agnostic, available for all models), *NOT FULLY TESTED* 
 - (3) [Kernal SHAP](https://github.com/slundberg/shap) feature importance (model agnostic, available for all models)
 
-    ![alt text](https://github.com/danielmlow/pydra-ml/blob/master/examples/shap_example.png?raw=true =250x)
+    ![alt text](https://github.com/danielmlow/pydra-ml/blob/master/examples/shap_example.png?raw=true)
+
+    Each bootstrapping split of the data may create its own model (e.g., different weights or best hyperparameters). For each split, we take the average of the absolute SHAP values across all test predictions. We then compute the average SHAP values across all splits.
+
 
 
 

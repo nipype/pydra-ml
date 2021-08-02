@@ -12,16 +12,25 @@ to:
 
 1. Efficiently train models using nested bootstrapping (with k-fold cross-validation performed in inner loop for hyperparameter tuning)
 
-2. Save models and **not redo model training and evaluation** when new metrics are added, or when
+2. **Compare *some* scikit-learn pipelines** in addition to base
+  classifiers (i.e., showing the distribution of performance of different models side-by-side).
+
+![alt text](https://github.com/danielmlow/pydra-ml/blob/master/examples/test-roc_auc_score-example.png?raw=true)
+
+![alt text](https://github.com/danielmlow/pydra-ml/blob/master/examples/test_performance_with_null_roc_auc_score.png?raw=true)
+
+3. Save models and **not redo model training and evaluation** when new metrics are added, or when
 number of iterations (`n_splits`) is increased. Just change spec file and it will use stored models to save time.
 
-3. Output report three types of **feature importance** methods:
+4. Output report three types of **feature importance** methods:
 - (1) standard feature importance methods for some models form sklearn (e.g., `coef_` for linear models, `feature_importances_` for tree-based models), *NOT FULLY TESTED*  
 - (2) sklearn's [permutation_importance](https://scikit-learn.org/stable/modules/generated/sklearn.inspection.permutation_importance.html) (model agnostic, available for all models), *NOT FULLY TESTED* 
 - (3) [Kernal SHAP](https://github.com/slundberg/shap) feature importance (model agnostic, available for all models)
 
-4. **Compare *some* scikit-learn pipelines** in addition to base
-  classifiers (i.e., showing the distribution of performance of different models side-by-side).
+    ![alt text](https://github.com/danielmlow/pydra-ml/blob/master/examples/shap_example.png?raw=true =250x)
+
+
+
 
 ### Installation
 

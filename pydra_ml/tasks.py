@@ -62,8 +62,8 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
     :param permute: whether to run it in permuted mode or not
     :return: outputs, trained classifier with sample indices
     """
-    from sklearn.pipeline import Pipeline
     import numpy as np
+    from sklearn.pipeline import Pipeline
 
     def to_instance(clf_info):
         mod = __import__(clf_info[0], fromlist=[clf_info[1]])
@@ -145,8 +145,8 @@ def create_model(X, y, clf_info, permute):
     :param permute: whether to run it in permuted mode or not
     :return: training error, classifier
     """
-    from sklearn.pipeline import Pipeline
     import numpy as np
+    from sklearn.pipeline import Pipeline
 
     def to_instance(clf_info):
         mod = __import__(clf_info[0], fromlist=[clf_info[1]])

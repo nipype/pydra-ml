@@ -1,13 +1,14 @@
-import warnings
 import datetime
 import os
 import pickle
-import pandas as pd
-import numpy as np
-from sklearn.metrics import explained_variance_score
-from scipy.stats import wilcoxon
-import seaborn as sns
+import warnings
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from scipy.stats import wilcoxon
+from sklearn.metrics import explained_variance_score
 
 
 def save_obj(obj, path):
@@ -35,13 +36,18 @@ def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap
         filename += f"_top_{plot_top_n_shap}"
 
     hm = sns.heatmap(
-        summary.round(3), annot=True, xticklabels=True, yticklabels=True, cbar=False, square=True,
+        summary.round(3),
+        annot=True,
+        xticklabels=True,
+        yticklabels=True,
+        cbar=False,
+        square=True,
     )
     hm.set_xticklabels(summary.columns, rotation=45)
     hm.set_yticklabels(summary.index, rotation=0)
     plt.ylabel("Features")
     plt.show(block=False)
-    plt.savefig(output_dir + f"summary_{filename}.png", dpi=100, bbox_inches='tight')
+    plt.savefig(output_dir + f"summary_{filename}.png", dpi=100, bbox_inches="tight")
 
 
 def shaps_to_summary(
@@ -368,7 +374,10 @@ def gen_report(
 
         # Create comparison stats table if the metric is a score
         if "score" in name:
-            effects, pvalues, = compute_pairwise_stats(subdf)
+            (
+                effects,
+                pvalues,
+            ) = compute_pairwise_stats(subdf)
             sns.set(style="whitegrid", palette="pastel", color_codes=True)
             sns.set_context("talk")
             plt.figure(figsize=(2 * len(order), 2 * len(order)))

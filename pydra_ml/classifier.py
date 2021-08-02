@@ -1,19 +1,21 @@
 #!/usr/bin/env python
 
-import pydra
-from pydra.mark import task, annotate
-from pydra.utils.messenger import AuditFlag, FileMessenger
-import typing as ty
 import os
-from .tasks import (
-    read_file,
-    gen_splits,
-    train_test_kernel,
-    calc_metric,
-    get_shap,
-    create_model,
-)
+import typing as ty
+
+import pydra
+from pydra.mark import annotate, task
+from pydra.utils.messenger import AuditFlag, FileMessenger
+
 from .report import gen_report
+from .tasks import (
+    calc_metric,
+    create_model,
+    gen_splits,
+    get_shap,
+    read_file,
+    train_test_kernel,
+)
 
 # Create pydra tasks
 read_file_pdt = task(
@@ -137,8 +139,8 @@ def run_workflow(wf, plugin, plugin_args, specfile="localspec"):
     results = wf.result(return_inputs=True)
     os.chdir(cwd)
 
-    import pickle as pk
     import datetime
+    import pickle as pk
 
     timestamp = datetime.datetime.utcnow().isoformat()
     timestamp = timestamp.replace(":", "").replace("-", "")

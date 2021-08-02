@@ -1,6 +1,8 @@
-import os
 import json
+import os
+
 import click
+
 from .classifier import gen_workflow, run_workflow
 
 

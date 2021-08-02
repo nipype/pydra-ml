@@ -1,13 +1,14 @@
-import warnings
 import datetime
 import os
 import pickle
-import pandas as pd
-import numpy as np
-from sklearn.metrics import explained_variance_score
-from scipy.stats import wilcoxon
-import seaborn as sns
+import warnings
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from scipy.stats import wilcoxon
+from sklearn.metrics import explained_variance_score
 
 
 def save_obj(obj, path):
@@ -27,7 +28,8 @@ def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap
         # if plot_top_n_shap != 1.0 but includes 1 (int)
         if plot_top_n_shap <= 0:
             raise ValueError(
-                "plot_top_n_shap should be a float between 0 and 1.0 or an integer >= 1. You set to zero or negative."
+                "plot_top_n_shap should be a float between 0 and 1.0 or an "
+                "integer >= 1. You set to zero or negative."
             )
         elif plot_top_n_shap < 1:
             plot_top_n_shap = int(np.round(plot_top_n_shap * num_features))
@@ -35,13 +37,18 @@ def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap
         filename += f"_top_{plot_top_n_shap}"
 
     hm = sns.heatmap(
-        summary.round(3), annot=True, xticklabels=True, yticklabels=True, cbar=False, square=True,
+        summary.round(3),
+        annot=True,
+        xticklabels=True,
+        yticklabels=True,
+        cbar=False,
+        square=True,
     )
     hm.set_xticklabels(summary.columns, rotation=45)
     hm.set_yticklabels(summary.index, rotation=0)
     plt.ylabel("Features")
     plt.show(block=False)
-    plt.savefig(output_dir + f"summary_{filename}.png", dpi=100, bbox_inches='tight')
+    plt.savefig(output_dir + f"summary_{filename}.png", dpi=100, bbox_inches="tight")
 
 
 def shaps_to_summary(
@@ -91,9 +98,8 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
             model_name = model_name[-1]
         model_name = model_name[1]
         indexes_all[model_name] = []
-        shaps = model_results[
-            1
-        ].output.shaps  # this is (N, P, F) N splits, P predictions, F feature_names
+        shaps = model_results[1].output.shaps
+        # this is (N, P, F) N splits, P predictions, F feature_names
         # make sure there are shap values (the
         if np.array(shaps[0]).size == 0:
             continue
@@ -107,8 +113,11 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
             "tn": [],
             "fp": [],
             "fn": [],
-        }  # this is key with shape (F, N) where F is feature_names, N is mean shap values across splits
-        # Obtain values for each bootstrapping split, then append summary statistics to shaps_n_splits
+        }
+        # this is key with shape (F, N) where F is feature_names, N is mean
+        # shap values across splits
+        # Obtain values for each bootstrapping split, then append summary
+        # statistics to shaps_n_splits
         for split_i in range(n_splits):
             shaps_i = shaps[split_i]  # all shap values for this bootstrapping split
             y_true = y_true_and_preds[split_i][0]
@@ -129,11 +138,13 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
                     indexes["fn"].append(i)
             indexes_all[model_name].append(indexes)
 
-            #  For each quadrant, obtain F shap values for P predictions, take the absolute mean weighted by performance across all predictions
+            #  For each quadrant, obtain F shap values for P predictions, take
+            #  the absolute mean weighted by performance across all predictions
             for quadrant in ["tp", "tn", "fp", "fn"]:
                 if len(indexes.get(quadrant)) == 0:
                     warnings.warn(
-                        f"There were no {quadrant.upper()}s, this will output NaNs in the csv and figure for this split column"
+                        f"There were no {quadrant.upper()}s, this will output "
+                        "NaNs in the csv and figure for this split column"
                     )
                 shaps_i_quadrant = shaps_i[
                     indexes.get(quadrant)
@@ -142,7 +153,8 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
                 shaps_n_splits[quadrant].append(
                     np.mean(abs_weighted_shap_values, axis=0)
                 )
-            #  obtain F shap values for P predictions, take the absolute mean weighted by performance across all predictions
+            #  obtain F shap values for P predictions, take the absolute mean
+            #  weighted by performance across all predictions
             abs_weighted_shap_values = np.abs(shaps_i) * split_performance
             shaps_n_splits["all"].append(np.mean(abs_weighted_shap_values, axis=0))
 
@@ -186,9 +198,8 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
             model_name = model_name[-1]
         model_name = model_name[1]
         indexes_all[model_name] = []
-        shaps = model_results[
-            1
-        ].output.shaps  # this is (N, P, F) N splits, P predictions, F feature_names
+        shaps = model_results[1].output.shaps
+        # this is (N, P, F) N splits, P predictions, F feature_names
         # make sure there are shap values (the
         if np.array(shaps[0]).size == 0:
             continue
@@ -202,8 +213,11 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
             "lm": [],
             "um": [],
             "up": [],
-        }  # this is key with shape (F, N) where F is feature_names, N is mean shap values across splits
-        # Obtain values for each bootstrapping split, then append summary statistics to shaps_n_splits
+        }
+        # this is key with shape (F, N) where F is feature_names, N is mean
+        # shap values across splits
+        # Obtain values for each bootstrapping split, then append summary
+        # statistics to shaps_n_splits
         for split_i in range(n_splits):
             shaps_i = shaps[split_i]  # all shap values for this bootstrapping split
             y_true = y_true_and_preds[split_i][0]
@@ -225,11 +239,13 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
                     indexes["up"].append(i)
             indexes_all[model_name].append(indexes)
 
-            #  For each quadrant, obtain F shap values for P predictions, take the absolute mean weighted by performance across all predictions
+            #  For each quadrant, obtain F shap values for P predictions, take
+            #  the absolute mean weighted by performance across all predictions
             for quadrant in ["lp", "lm", "um", "up"]:
                 if len(indexes.get(quadrant)) == 0:
                     warnings.warn(
-                        f"There were no {quadrant.upper()}s, this will output NaNs in the csv and figure for this split column"
+                        f"There were no {quadrant.upper()}s, this will output "
+                        "NaNs in the csv and figure for this split column"
                     )
                 shaps_i_quadrant = shaps_i[
                     indexes.get(quadrant)
@@ -238,7 +254,8 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
                 shaps_n_splits[quadrant].append(
                     np.mean(abs_weighted_shap_values, axis=0)
                 )
-            #  obtain F shap values for P predictions, take the absolute mean weighted by performance across all predictions
+            #  obtain F shap values for P predictions, take the absolute mean
+            #  weighted by performance across all predictions
             abs_weighted_shap_values = np.abs(shaps_i) * split_performance
             shaps_n_splits["all"].append(np.mean(abs_weighted_shap_values, axis=0))
 
@@ -359,8 +376,6 @@ def gen_report(
         sns.despine(left=True)
         plt.tight_layout()
 
-        import datetime
-
         timestamp = datetime.datetime.utcnow().isoformat()
         timestamp = timestamp.replace(":", "").replace("-", "")
         plt.savefig(f"test-{name}-{timestamp}.png")
@@ -368,7 +383,10 @@ def gen_report(
 
         # Create comparison stats table if the metric is a score
         if "score" in name:
-            effects, pvalues, = compute_pairwise_stats(subdf)
+            (
+                effects,
+                pvalues,
+            ) = compute_pairwise_stats(subdf)
             sns.set(style="whitegrid", palette="pastel", color_codes=True)
             sns.set_context("talk")
             plt.figure(figsize=(2 * len(order), 2 * len(order)))

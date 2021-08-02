@@ -156,12 +156,12 @@ The workflow will output:
 - `results-{timestamp}.pkl` containing 1 list per model used. For example, if
 assigned to variable `results`, it is accessed through `results[0]` to `results[N]`
 (e.g., if `permute: [true,false]` then it will output the model trained on permuted labels first `results[0]` and the model trained on the labels
-second `results[1]`. If there is an additional model, these will be accesed through `results[2]` and `results[3]`).
+second `results[1]`. If there is an additional model, these will be accessed through `results[2]` and `results[3]`).
 Each model contains:
-    - `dict` accesed through `results[0][0]` with model information:
+    - `dict` accessed through `results[0][0]` with model information:
      `{'ml_wf.clf_info': ['sklearn.neural_network', 'MLPClassifier',
          {'alpha': 1, 'max_iter': 1000}], 'ml_wf.permute': False}`
-    - `pydra Result obj` accesed through `results[0][1]` with attribute `output`
+    - `pydra Result obj` accessed through `results[0][1]` with attribute `output`
       which itself has attributes:
         - `feature_names`: from the columns of the data csv.
         And the following attributes organized in N lists for N bootstrapping samples:

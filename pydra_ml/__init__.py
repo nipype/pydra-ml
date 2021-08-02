@@ -12,8 +12,7 @@ del get_versions
 
 
 def get_logger(name=None):
-    """Return a logger to use
-    """
+    """Return a logger to use"""
     return logging.getLogger("pydra_ml" + (".%s" % name if name else ""))
 
 

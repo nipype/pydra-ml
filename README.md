@@ -8,7 +8,7 @@ across a set of classifiers. The intent is to use this as an application to make
 Pydra more robust while allowing users to generate classification reports more
 easily. This application leverages Pydra's powerful splitters and combiners to
 scale across a set of classifiers and metrics. It will also use Pydra's caching
-to: 
+to:
 
 1. Efficiently train models using nested bootstrapping (with k-fold cross-validation performed in inner loop for hyperparameter tuning)
 
@@ -27,8 +27,8 @@ to:
 number of iterations (`n_splits`) is increased. Just change spec file and it will use stored models to save time.
 
 4. Output report three types of **feature importance** methods:
-- (1) standard feature importance methods for some models form sklearn (e.g., `coef_` for linear models, `feature_importances_` for tree-based models), *NOT FULLY TESTED*  
-- (2) sklearn's [permutation_importance](https://scikit-learn.org/stable/modules/generated/sklearn.inspection.permutation_importance.html) (model agnostic, available for all models), *NOT FULLY TESTED* 
+- (1) standard feature importance methods for some models form sklearn (e.g., `coef_` for linear models, `feature_importances_` for tree-based models), *NOT FULLY TESTED*
+- (2) sklearn's [permutation_importance](https://scikit-learn.org/stable/modules/generated/sklearn.inspection.permutation_importance.html) (model agnostic, available for all models), *NOT FULLY TESTED*
 - (3) [Kernal SHAP](https://github.com/slundberg/shap) feature importance (model agnostic, available for all models)
 
     ![alt text](https://github.com/danielmlow/pydra-ml/blob/master/examples/shap_example.png?raw=true)
@@ -51,8 +51,8 @@ pip install pydra-ml
 
 This repo installs `pydraml` a CLI to allow usage without any programming.
 
-To test the CLI for a classification example, copy the `examples/breast_cancer.csv` and
-`examples/classification_cancer_short-spec.json` to a folder and run or run within in `examples/` folder. 
+To test the CLI for a classification example, copy the `pydra_ml/tests/data/breast_cancer.csv` and
+`examples/classification_cancer_short-spec.json` to a folder and run or run within in `examples/` folder.
 
 ```
 $ pydraml -s classification_cancer_short-spec.json
@@ -64,8 +64,8 @@ $ pydraml -s classification_cancer_toy-spec.json
 ```
 
 
-To check a regression example, copy the `examples/diabetes_table.csv` and
-`examples/regression_diabetes_spec.json` to a folder and run or run within in `examples/` folder. 
+To check a regression example, copy the `pydra_ml/tests/data/diabetes_table.csv` and
+`examples/regression_diabetes_spec.json` to a folder and run or run within in `examples/` folder.
 
 ```
 $ pydraml -s regression_diabetes_spec.json
@@ -115,8 +115,8 @@ will want to generate `x_indices` programmatically.
 - *test_size*: Fraction of data to use for test set in each iteration
 - *clf_info*: List of scikit-learn classifiers to use.
 - *permute*: List of booleans to indicate whether to generate a null model or not
-- *gen_feature_importance*: Boolean indicating whether unique feature importance method should be generated for each model if available (e.g., `coef_` for linear models, `feature_importances_` for tree-based models) *NOT FULLY TESTED: set to false* 
-- *gen_permutation_importance*: Boolean indicating whether permutation_importance values are generated (model agnostic, available for all models) *NOT FULLY TESTED: set to false* 
+- *gen_feature_importance*: Boolean indicating whether unique feature importance method should be generated for each model if available (e.g., `coef_` for linear models, `feature_importances_` for tree-based models) *NOT FULLY TESTED: set to false*
+- *gen_permutation_importance*: Boolean indicating whether permutation_importance values are generated (model agnostic, available for all models) *NOT FULLY TESTED: set to false*
 - *gen_shap*: Boolean indicating whether shap values are generated (model agnostic, available for all models)
 - *nsamples*: Number of samples to use for shap estimation, use integer or the "auto" setting uses `nsamples = 2 * X.shape[1] + 2048`.
 - *l1_reg*: Type of regularizer to use for shap estimation
@@ -200,25 +200,25 @@ The workflow will output:
 - `results-{timestamp}.pkl` containing 1 list per model used. For example, if the `pkl` file is
 assigned to variable `results`, the models are accessed through `results[0]` to `results[N]`.
  If `permute: [false,true]` then it will output the model trained on the labels first `results[0]` and the model trained on the permuted labels
-second `results[1]`. If there is an additional model, these will be accesed through `results[2]` (labels) and `results[3]` (permuted)).      
+second `results[1]`. If there is an additional model, these will be accesed through `results[2]` (labels) and `results[3]` (permuted)).
 
   Each model contains:
     - `dict` accesed through `results[0][0]` with model information:
         ```python
         import pickle as pk
-        
+
         with open("results-20201208T010313.229190.pkl", "rb") as fp:
             results = pk.load(fp)
-        
+
         print(results[0][0]) #1st model trained on labels
         ```
-              
+
         `{'ml_wf.clf_info': ['sklearn.neural_network', 'MLPClassifier', {'alpha': 1, 'max_iter': 1000}], 'ml_wf.permute': False}`
-              
+
         ```python
         print(results[3][0]) #2nd models trained on permuted lables
         ```
-        
+
         `{'ml_wf.clf_info':['sklearn.linear_model', 'LogisticRegression', {'penalty': 'l2'}], 'ml_wf.permute': True}`
 
     - `pydra Result obj` accesed through `results[0][1].output`:
@@ -228,57 +228,57 @@ second `results[1]`. If there is an additional model, these will be accesed thro
           ```python
           print(results[1][1].output.feature_names)
           ```
-          
+
           `['mean radius', 'mean texture', 'mean perimeter', 'mean area', ... ]`
-        
+
           And the following attributes organized in *n_splits* lists for *n_splits* bootstrapping samples:
         - `output`: *n_splits* lists, each one with two lists for true and predicted labels.
         - `score`: *n_splits* lists each one containing M different metric scores.
-        
+
           Three types of feature importance methods:
 
         - (1) `feature_importance`: standard feature importance method from *sklearn*. Limitation: not all models have standard methods and difficult to compare methods across models.
           - `pipeline.coef_` for linear models (coefficients of regression, SVC).
-          - `pipeline.coefs_` for multi-layer perceptron, which returns `j` lists for `j` hidden nodes connections with each input 
+          - `pipeline.coefs_` for multi-layer perceptron, which returns `j` lists for `j` hidden nodes connections with each input
           - `pipeline.feature_importances_` for decision tree, Random Forest, or boosting algorithms
 
           ```python
           print(results[1][1].output.feature_importance)
           ```
-        - (2) `permutation_importance`: the difference in performance from permutating the feature column as in [sklearn's permutation importance](https://scikit-learn.org/stable/modules/generated/sklearn.inspection.permutation_importance.html). 
-        Advantage: works for all models (i.e., model agnostic). Limitation: measures decrease in performance, not magnitude of each feature. 
-        
+        - (2) `permutation_importance`: the difference in performance from permutating the feature column as in [sklearn's permutation importance](https://scikit-learn.org/stable/modules/generated/sklearn.inspection.permutation_importance.html).
+        Advantage: works for all models (i.e., model agnostic). Limitation: measures decrease in performance, not magnitude of each feature.
+
             ```python
               print(results[1][1].output.permutation_importance)
             ```
-        
+
         - (3) `shaps`: `n_splits` lists each one with a list of shape (P,F) where P is the
         amount of predictions and F the different SHAP values for each feature.
         `shaps` is empty if `gen_shap` is set to `false` or if `permute` is set
         to true. Advantage: model agnostic, produces magnitude for each feature.
-            
+
             ```python
               print(results[1][1].output.shaps)
             ```
-            
+
         - `model`: A pickled version of the model trained on all the input data.
         One can use this model to test on new data that has the exact same input
         shape and features as the trained model. For example:
-        
+
           ```python
           import pickle as pk
           import numpy as np
-          
+
           with open("results-20201208T010313.229190.pkl", "rb") as fp:
               results = pk.load(fp)
-          
+
           trained_model = results[0][1].output.model
           trained_model.predict(np.random.rand(1, 30))
           ```
-          
+
           Please make sure the value of `results[N][0].get('ml_wf.permute')` is `False` to ensure that you are not using
           a permuted model.
-        
+
 
 - One figure per metric with performance distribution across splits (with or
 without null distribution trained on permuted labels)
@@ -311,8 +311,8 @@ without null distribution trained on permuted labels)
 
 You will need to understand a bit of pydra to know how to debug this application for
 now. If the process crashes, the easiest way to restart is to remove the `cache-wf`
-folder first. However, if you are rerunning, you could also remove any `.lock` file
-in the `cache-wf`directory. 
+folder first. However, if you are rerunning, you could also remove any `.lock` file in the `cache-wf` directory.
+
 
 ## Developer installation
 

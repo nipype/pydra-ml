@@ -173,9 +173,8 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
             model_name = model_name[-1]
         model_name = model_name[1]
         indexes_all[model_name] = []
-        shaps = model_results[
-            1
-        ].output.shaps  # this is (N, P, F) N splits, P predictions, F feature_names
+        shaps = model_results[1].output.shaps
+        # this is (N, P, F) N splits, P predictions, F feature_names
         # make sure there are shap values (the
         if np.array(shaps[0]).size == 0:
             continue
@@ -189,11 +188,12 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
             "tn": [],
             "fp": [],
             "fn": [],
-        }  # this is key with shape (F, N) where F is feature_names,
-        # N is mean shap values across splits
+        }
+        # this is key with shape (F, N) where F is feature_names, N is mean
+        # shap values across splits
 
-        # Obtain values for each bootstrapping split,
-        # then append summary statistics to shaps_n_splits
+        # Obtain values for each bootstrapping split, then append summary
+        # statistics to shaps_n_splits
         for split_i in range(n_splits):
             shaps_i = shaps[split_i]  # all shap values for this bootstrapping split
             y_true = y_true_and_preds[split_i][0]
@@ -274,9 +274,8 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
             model_name = model_name[-1]
         model_name = model_name[1]
         indexes_all[model_name] = []
-        shaps = model_results[
-            1
-        ].output.shaps  # this is (N, P, F) N splits, P predictions, F feature_names
+        shaps = model_results[1].output.shaps
+        # this is (N, P, F) N splits, P predictions, F feature_names
         # make sure there are shap values (the
         if np.array(shaps[0]).size == 0:
             continue

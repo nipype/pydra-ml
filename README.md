@@ -197,6 +197,7 @@ example:
 
 ## Output:
 The workflow will output:
+<<<<<<< HEAD
 - `results-{timestamp}.pkl` containing 1 list per model used. For example, if the `pkl` file is
 assigned to variable `results`, the models are accessed through `results[0]` to `results[N]`.
  If `permute: [false,true]` then it will output the model trained on the labels first (`results[0]`) and the model trained on the permuted labels second (`results[1]`). If there is an additional model, these will be accessed through `results[2]` (labels) and `results[3]` (permuted).
@@ -221,6 +222,17 @@ assigned to variable `results`, the models are accessed through `results[0]` to 
         `{'ml_wf.clf_info':['sklearn.linear_model', 'LogisticRegression', {'penalty': 'l2'}], 'ml_wf.permute': True}`
 
     - `pydra Result obj` accessed through `results[0][1].output`:
+=======
+- `results-{timestamp}.pkl` containing 1 list per model used. For example, if
+assigned to variable `results`, it is accessed through `results[0]` to `results[N]`
+(e.g., if `permute: [true,false]` then it will output the model trained on permuted labels first `results[0]` and the model trained on the labels
+second `results[1]`. If there is an additional model, these will be accessed through `results[2]` and `results[3]`).
+Each model contains:
+    - `dict` accessed through `results[0][0]` with model information:
+     `{'ml_wf.clf_info': ['sklearn.neural_network', 'MLPClassifier',
+         {'alpha': 1, 'max_iter': 1000}], 'ml_wf.permute': False}`
+    - `pydra Result obj` accessed through `results[0][1]` with attribute `output`
+>>>>>>> ea2092bb5f199aa6ff83f25f863d3652f824f6af
       which itself has attributes:
         - `feature_names`: from the columns of the data csv.
 

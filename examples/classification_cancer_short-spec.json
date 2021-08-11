@@ -23,4 +23,3 @@
  "plot_top_n_shap": 16,
  "metrics": ["roc_auc_score", "accuracy_score"]
  }
-

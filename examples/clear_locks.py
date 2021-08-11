@@ -1,9 +1,9 @@
-from glob import glob
 import os
 import shutil
+from glob import glob
 
-fl = glob('cache-wf/*.lock')
-checksums = [val.split('_')[1][:64] for val in fl]
+fl = glob("cache-wf/*.lock")
+checksums = [val.split("_")[1][:64] for val in fl]
 paths = []
 for checksum in checksums:
     paths.extend(glob(f"cache-wf/*{checksum}*"))

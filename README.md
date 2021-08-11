@@ -29,7 +29,7 @@ number of iterations (`n_splits`) is increased. Just change spec file and it wil
 4. Output report three types of **feature importance** methods:
 - (1) standard feature importance methods for some models form sklearn (e.g., `coef_` for linear models, `feature_importances_` for tree-based models), *NOT FULLY TESTED*
 - (2) sklearn's [permutation_importance](https://scikit-learn.org/stable/modules/generated/sklearn.inspection.permutation_importance.html) (model agnostic, available for all models), *NOT FULLY TESTED*
-- (3) [Kernal SHAP](https://github.com/slundberg/shap) feature importance (model agnostic, available for all models)
+- (3) [Kernel SHAP](https://github.com/slundberg/shap) feature importance (model agnostic, available for all models)
 
     ![alt text](https://github.com/danielmlow/pydra-ml/blob/master/examples/shap_example.png?raw=true)
 
@@ -199,11 +199,10 @@ example:
 The workflow will output:
 - `results-{timestamp}.pkl` containing 1 list per model used. For example, if the `pkl` file is
 assigned to variable `results`, the models are accessed through `results[0]` to `results[N]`.
- If `permute: [false,true]` then it will output the model trained on the labels first `results[0]` and the model trained on the permuted labels
-second `results[1]`. If there is an additional model, these will be accesed through `results[2]` (labels) and `results[3]` (permuted)).
+ If `permute: [false,true]` then it will output the model trained on the labels first (`results[0]`) and the model trained on the permuted labels second (`results[1]`). If there is an additional model, these will be accessed through `results[2]` (labels) and `results[3]` (permuted).
 
   Each model contains:
-    - `dict` accesed through `results[0][0]` with model information:
+    - `dict` accessed through `results[0][0]` with model information:
         ```python
         import pickle as pk
 
@@ -216,12 +215,12 @@ second `results[1]`. If there is an additional model, these will be accesed thro
         `{'ml_wf.clf_info': ['sklearn.neural_network', 'MLPClassifier', {'alpha': 1, 'max_iter': 1000}], 'ml_wf.permute': False}`
 
         ```python
-        print(results[3][0]) #2nd models trained on permuted lables
+        print(results[3][0]) #2nd models trained on permuted labels
         ```
 
         `{'ml_wf.clf_info':['sklearn.linear_model', 'LogisticRegression', {'penalty': 'l2'}], 'ml_wf.permute': True}`
 
-    - `pydra Result obj` accesed through `results[0][1].output`:
+    - `pydra Result obj` accessed through `results[0][1].output`:
       which itself has attributes:
         - `feature_names`: from the columns of the data csv.
 

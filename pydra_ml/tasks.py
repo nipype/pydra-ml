@@ -62,8 +62,8 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
     :param permute: whether to run it in permuted mode or not
     :return: outputs, trained classifier with sample indices
     """
-    from sklearn.pipeline import Pipeline
     import numpy as np
+    from sklearn.pipeline import Pipeline
 
     def to_instance(clf_info):
         mod = __import__(clf_info[0], fromlist=[clf_info[1]])
@@ -121,10 +121,11 @@ def calc_metric(output, metrics):
 def get_feature_importance(permute, model, gen_feature_importance=True):
     if permute or not gen_feature_importance:
         return []
-    pipe, train_index, test_index = model
-    pipeline = pipe.steps[1][1]
-    model_name = str(pipe.steps[1][1])
-    # Each model type may have a different method or none at all. See here for sklearn models: https://scikit-learn.org/stable/supervised_learning.html
+    pipeline, train_index, test_index = model
+    pipeline_steps = pipeline.steps[1][1]
+    model_name = str(pipeline_steps)
+    # Each model type may have a different method or none at all.
+    # See here for sklearn models: https://scikit-learn.org/stable/supervised_learning.html
     tree_models = [
         "Tree",
         "Forest",
@@ -134,22 +135,40 @@ def get_feature_importance(permute, model, gen_feature_importance=True):
     if any(n in model_name for n in tree_models):
         # Tree model is in model_name
         feature_importance = (
-            pipeline.feature_importances_
+            pipeline_steps.feature_importances_
         )  # for decision tree, Random Forest, or boosting algorithms
     elif "MLP" in model_name:
         feature_importance = (
-            pipeline.coefs_
+            pipeline_steps.coefs_
         )  # for multi-layer perceptron, which returns a list
     # elif 'LinearRegression' in model_name:
     # 	feature_importance = pipeline.coef_  # for LinearRegression in particular
     else:
         try:
-            feature_importance = pipeline.coef_  # for linear models
-        except:
+            feature_importance = pipeline_steps.coef_  # for linear models
+        except AttributeError as e:
             import warnings
 
             warnings.warn(
-                f"Warning: gen_feature_importance() could not be computed because the following methods did not work: pipeline.feature_importances_, pipeline.coefs_, pipeline.coef_ . Please add correct method in tasks.py or if inexistent, set gen_feature_importance to false."
+                f""""
+
+                Warning: you set gen_feature_importance to true, but it
+                could not be computed and will be returned as an empty list
+                because after running this
+
+                pipeline_steps = pipeline.steps[1][1]
+
+                none of the following methods worked:
+
+                pipeline_steps.feature_importances_
+                pipeline_steps.coefs_
+                pipeline_steps.coef_
+
+                Please add correct method in tasks.py or if inexistent,
+                set gen_feature_importance to false in the spec file.
+
+                This is the error that was returned by sklearn:\n\t{e}\n
+                """
             )
             feature_importance = []
     return feature_importance
@@ -210,8 +229,8 @@ def create_model(X, y, clf_info, permute):
     :param permute: whether to run it in permuted mode or not
     :return: training error, classifier
     """
-    from sklearn.pipeline import Pipeline
     import numpy as np
+    from sklearn.pipeline import Pipeline
 
     def to_instance(clf_info):
         mod = __import__(clf_info[0], fromlist=[clf_info[1]])

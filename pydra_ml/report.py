@@ -1,13 +1,13 @@
-import warnings
 import datetime
 import os
 import pickle
-import pandas as pd
-import numpy as np
-from sklearn.metrics import explained_variance_score, accuracy_score
-from scipy.stats import wilcoxon
-import seaborn as sns
+import warnings
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from sklearn.metrics import accuracy_score, explained_variance_score
 
 
 def save_obj(obj, path):
@@ -102,7 +102,8 @@ def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap
         # if plot_top_n_shap != 1.0 but includes 1 (int)
         if plot_top_n_shap <= 0:
             raise ValueError(
-                "plot_top_n_shap should be a float between 0 and 1.0 or an integer >= 1. You set to zero or negative."
+                """plot_top_n_shap should be a float between 0 and 1.0 or an
+                integer >= 1. You set to zero or negative."""
             )
         elif plot_top_n_shap < 1:
             plot_top_n_shap = int(np.round(plot_top_n_shap * num_features))
@@ -188,8 +189,11 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
             "tn": [],
             "fp": [],
             "fn": [],
-        }  # this is key with shape (F, N) where F is feature_names, N is mean shap values across splits
-        # Obtain values for each bootstrapping split, then append summary statistics to shaps_n_splits
+        }  # this is key with shape (F, N) where F is feature_names,
+        # N is mean shap values across splits
+
+        # Obtain values for each bootstrapping split,
+        # then append summary statistics to shaps_n_splits
         for split_i in range(n_splits):
             shaps_i = shaps[split_i]  # all shap values for this bootstrapping split
             y_true = y_true_and_preds[split_i][0]
@@ -210,11 +214,13 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
                     indexes["fn"].append(i)
             indexes_all[model_name].append(indexes)
 
-            #  For each quadrant, obtain F shap values for P predictions, take the absolute mean weighted by performance across all predictions
+            #  For each quadrant, obtain F shap values for P predictions,
+            # take the absolute mean weighted by performance across all predictions
             for quadrant in ["tp", "tn", "fp", "fn"]:
                 if len(indexes.get(quadrant)) == 0:
                     warnings.warn(
-                        f"There were no {quadrant.upper()}s, this will output NaNs in the csv and figure for this split column"
+                        f"""There were no {quadrant.upper()}s, this will output NaNs
+                        in the csv and figure for this split column"""
                     )
                 shaps_i_quadrant = shaps_i[
                     indexes.get(quadrant)
@@ -223,7 +229,8 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
                 shaps_n_splits[quadrant].append(
                     np.mean(abs_weighted_shap_values, axis=0)
                 )
-            #  obtain F shap values for P predictions, take the absolute mean weighted by performance across all predictions
+            #  obtain F shap values for P predictions, take the absolute mean
+            #  weighted by performance across all predictions
             abs_weighted_shap_values = np.abs(shaps_i) * split_performance
             shaps_n_splits["all"].append(np.mean(abs_weighted_shap_values, axis=0))
 
@@ -283,8 +290,12 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
             "lm": [],
             "um": [],
             "up": [],
-        }  # this is key with shape (F, N) where F is feature_names, N is mean shap values across splits
-        # Obtain values for each bootstrapping split, then append summary statistics to shaps_n_splits
+        }
+        #   this is key with shape (F, N) where F is feature_names,
+        #   N is mean shap values across splits
+
+        # Obtain values for each bootstrapping split,
+        # then append summary statistics to shaps_n_splits
         for split_i in range(n_splits):
             shaps_i = shaps[split_i]  # all shap values for this bootstrapping split
             y_true = y_true_and_preds[split_i][0]
@@ -306,11 +317,13 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
                     indexes["up"].append(i)
             indexes_all[model_name].append(indexes)
 
-            #  For each quadrant, obtain F shap values for P predictions, take the absolute mean weighted by performance across all predictions
+            #  For each quadrant, obtain F shap values for P predictions,
+            #  take the absolute mean weighted by performance across all predictions
             for quadrant in ["lp", "lm", "um", "up"]:
                 if len(indexes.get(quadrant)) == 0:
                     warnings.warn(
-                        f"There were no {quadrant.upper()}s, this will output NaNs in the csv and figure for this split column"
+                        f"""There were no {quadrant.upper()}s, this will
+                        output NaNs in the csv and figure for this split column"""
                     )
                 shaps_i_quadrant = shaps_i[
                     indexes.get(quadrant)
@@ -319,7 +332,8 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
                 shaps_n_splits[quadrant].append(
                     np.mean(abs_weighted_shap_values, axis=0)
                 )
-            #  obtain F shap values for P predictions, take the absolute mean weighted by performance across all predictions
+            #  obtain F shap values for P predictions, take the absolute mean weighted
+            #  by performance across all predictions
             abs_weighted_shap_values = np.abs(shaps_i) * split_performance
             shaps_n_splits["all"].append(np.mean(abs_weighted_shap_values, axis=0))
 
@@ -349,8 +363,13 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
 def permutation_test_pvalue(mean_score, distribution):
     """
     the permutation-based empirical p-value from Test 1 in:
-    Ojala and Garriga. Permutation Tests for Studying Classifier Performance. The Journal of Machine Learning Research (2010) vol. 11
-    Based off of: https://github.com/scikit-learn/scikit-learn/blob/15a949460dbf19e5e196b8ef48f9712b72a3b3c3/sklearn/model_selection/_validation.py#L1062
+    Ojala and Garriga. Permutation Tests for Studying
+    Classifier Performance. The Journal of Machine Learning
+    Research (2010) vol. 11
+    Based off of:
+    github.com/scikit-learn/scikit-learn/blob
+    /15a949460dbf19e5e196b8ef48f9712b72a3b3c3
+    /sklearn/model_selection/_validation.py#L1062
     """
 
     n_distribution = len(distribution)
@@ -359,10 +378,9 @@ def permutation_test_pvalue(mean_score, distribution):
 
 
 def compute_pairwise_stats(df):
-    """Run Wilcoxon signed rank tests across pairs of classifiers.
+    """Run permutation test p-value across pairs of classifiers.
 
     When comparing a classifier to itself, compare to its null distribution.
-    A one sided test is used.
 
     Assumes that the dataframe has three keys: Classifier, type, and score
     with type referring to either the data distribution or the null distribution
@@ -390,8 +408,8 @@ def compute_pairwise_stats(df):
                 distribution = group1nulldf["score"].values
                 pval = permutation_test_pvalue(mean_score, distribution)
                 stat = (
-                    0
-                )  # ToDo: compute effect size independent of amount of permutations
+                    0  # ToDo: compute effect size independent of amount of permutations
+                )
 
             effects[idx1, idx2] = stat
             pvalues[idx1, idx2] = pval
@@ -437,6 +455,8 @@ def gen_report(
     performance_table(df, output_dir, round_decimals=2)
 
     # Plot distribution of scores
+    import datetime
+
     order = [group[0] for group in df.groupby("Classifier")]
     for name, subdf in df.groupby("metric"):
         sns.set(style="whitegrid", palette="pastel", color_codes=True)
@@ -460,8 +480,6 @@ def gen_report(
         sns.despine(left=True)
         plt.tight_layout()
 
-        import datetime
-
         timestamp = datetime.datetime.utcnow().isoformat()
         timestamp = timestamp.replace(":", "").replace("-", "")
         plt.savefig(f"test-{name}-{timestamp}.png")
@@ -469,16 +487,18 @@ def gen_report(
 
         # Create comparison stats table if the metric is a score
         if "score" in name:
-            effects, pvalues, = compute_pairwise_stats(subdf)
+            (
+                effects,
+                pvalues,
+            ) = compute_pairwise_stats(subdf)
             sns.set(style="whitegrid", palette="pastel", color_codes=True)
             sns.set_context("talk")
             plt.figure(figsize=(2 * len(order), 2 * len(order)))
             ax = sns.heatmap(
                 pvalues
                 <= 0.05,  # ToDo: When effects has been implemented, set this to: effects
-                annot=pvalues.round(
-                    3
-                ),  # ToDo: When effects has been implemented, set this to: np.fix(-np.log10(pvalues))
+                annot=pvalues.round(3),  # ToDo: When effects has been implemented,
+                # set this to: np.fix(-np.log10(pvalues))
                 yticklabels=order,
                 xticklabels=order,
                 cbar=False,  # ToDo: When effects has been implemented, set this to: True

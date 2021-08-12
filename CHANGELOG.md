@@ -1,3 +1,15 @@
+# 0.5.1 (Thu Aug 12 2021)
+
+#### 🐛 Bug Fix
+
+- Add MANIFEST.in to help pypi publishing [#44](https://github.com/nipype/pydra-ml/pull/44) ([@satra](https://github.com/satra))
+
+#### Authors: 1
+
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+
+---
+
 # 0.5.0 (Thu Aug 12 2021)
 
 #### 🚀 Enhancement

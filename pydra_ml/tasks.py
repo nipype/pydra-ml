@@ -92,6 +92,9 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
 
     train_index, test_index = train_test_split[split_index]
     y = y.ravel()
+    if type(X[0][0]) == str:
+        # it's loaded as bytes, so we need to decode as utf-8
+        X = np.array([str.encode(n[0]).decode("utf-8") for n in X])
     if permute:
         pipe.fit(X[train_index], y[np.random.permutation(train_index)])
     else:
@@ -113,6 +116,87 @@ def calc_metric(output, metrics):
         metric_func = getattr(metric_mod, metric)
         score.append(metric_func(output[0], output[1]))
     return score, output
+
+
+def get_feature_importance(permute, model, gen_feature_importance=True):
+    if permute or not gen_feature_importance:
+        return []
+    pipeline, train_index, test_index = model
+    pipeline_steps = pipeline.steps[1][1]
+    model_name = str(pipeline_steps)
+    # Each model type may have a different method or none at all.
+    # See here for sklearn models: https://scikit-learn.org/stable/supervised_learning.html
+    tree_models = [
+        "Tree",
+        "Forest",
+        "Boost",
+        "XGB",
+    ]  # not available for Bagging methods, voting methods or  'xgboost' library models.
+    if any(n in model_name for n in tree_models):
+        # Tree model is in model_name
+        feature_importance = (
+            pipeline_steps.feature_importances_
+        )  # for decision tree, Random Forest, or boosting algorithms
+    elif "MLP" in model_name:
+        feature_importance = (
+            pipeline_steps.coefs_
+        )  # for multi-layer perceptron, which returns a list
+    # elif 'LinearRegression' in model_name:
+    # 	feature_importance = pipeline.coef_  # for LinearRegression in particular
+    else:
+        try:
+            feature_importance = pipeline_steps.coef_  # for linear models
+        except AttributeError as e:
+            import warnings
+
+            warnings.warn(
+                f""""
+
+                Warning: you set gen_feature_importance to true, but it
+                could not be computed and will be returned as an empty list
+                because after running this
+
+                pipeline_steps = pipeline.steps[1][1]
+
+                none of the following methods worked:
+
+                pipeline_steps.feature_importances_
+                pipeline_steps.coefs_
+                pipeline_steps.coef_
+
+                Please add correct method in tasks.py or if inexistent,
+                set gen_feature_importance to false in the spec file.
+
+                This is the error that was returned by sklearn:\n\t{e}\n
+                """
+            )
+            feature_importance = []
+    return feature_importance
+
+
+def get_permutation_importance(
+    X,
+    y,
+    permute,
+    model,
+    permutation_importance_n_repeats=5,
+    permutation_importance_scoring=None,
+    gen_permutation_importance=True,
+):
+    if permute or not gen_permutation_importance:
+        return []
+    from sklearn.inspection import permutation_importance
+
+    pipe, train_index, test_index = model
+    results = permutation_importance(
+        pipe.steps[1][1],
+        X[test_index],
+        y[test_index],
+        scoring=permutation_importance_scoring,
+        n_repeats=permutation_importance_n_repeats,
+    )
+    permutation_feature_importance = results.importances_mean
+    return permutation_feature_importance
 
 
 def get_shap(X, permute, model, gen_shap=False, nsamples="auto", l1_reg="aic"):

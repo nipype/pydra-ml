@@ -7,13 +7,87 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import wilcoxon
-from sklearn.metrics import explained_variance_score
+from sklearn.metrics import accuracy_score, explained_variance_score
 
 
 def save_obj(obj, path):
     with open(path, "wb") as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+
+
+def performance_table(df, output_dir, round_decimals=2):
+    timestamp = datetime.datetime.utcnow().isoformat()
+    timestamp = timestamp.replace(":", "").replace("-", "")
+    output_dir = output_dir + f"performance_table-{timestamp}/"
+    os.mkdir(output_dir)
+
+    classifier_names = df.Classifier.unique()
+    classifier_names.sort()
+
+    for idx, metric in enumerate(df.metric.unique()):
+        df_metric = df[df.metric == metric]
+        # data
+        df_metric_data = df_metric[df_metric.type == "data"]
+        df_metric_data = df_metric_data[["score", "Classifier"]]
+        dfp = df_metric_data.pivot(columns="Classifier")
+        dfp.columns = dfp.columns.droplevel()
+        df_metric_data_clean = pd.DataFrame()
+        for clf in classifier_names:
+            df_clf = dfp[clf].dropna()
+            df_clf = df_clf.reset_index(drop=True)
+            df_metric_data_clean[clf] = df_clf
+        df_metric_data_clean_median = df_metric_data_clean.median().T
+        df_metric_data_clean.loc[
+            len(df_metric_data_clean)
+        ] = df_metric_data_clean_median
+        df_metric_data_clean.index = list(df_metric_data_clean.index[:-1]) + ["median"]
+        df_metric_data_clean.to_csv(
+            os.path.join(
+                output_dir,
+                f"test-performance-table_{metric}_all-splits_{timestamp}.csv",
+            )
+        )
+
+        # null
+        if "null" in df_metric.type.unique():
+            df_metric_null = df_metric[df_metric.type == "null"]
+            df_metric_null = df_metric_null[["score", "Classifier"]]
+            dfp = df_metric_null.pivot(columns="Classifier")
+            dfp.columns = dfp.columns.droplevel()
+            df_metric_null_clean = pd.DataFrame()
+            for clf in df_metric_data.Classifier.unique():
+                df_clf = dfp[clf].dropna()
+                df_clf = df_clf.reset_index(drop=True)
+                df_metric_null_clean[clf] = df_clf
+            df_metric_null_clean_median = df_metric_null_clean.median().T.round(2)
+
+        # Save median score with median null score in square brackets as strings
+
+        df_summary = pd.DataFrame(index=[0], columns=classifier_names)
+        df_summary[classifier_names] = np.zeros(len(classifier_names))
+
+        for clf in classifier_names:
+            data_median = round(df_metric_data_clean_median[clf], round_decimals)
+            ci_lower = round(
+                np.percentile(df_metric_data_clean[clf].values, 2.5), round_decimals
+            )  # 95% confidence interval
+            ci_upper = round(
+                np.percentile(df_metric_data_clean[clf].values, 97.5), round_decimals
+            )
+            if "null" in df_metric.type.unique():
+                null_median = round(df_metric_null_clean_median[clf], 2)
+                df_summary.loc[
+                    0, clf
+                ] = f"{data_median} [{ci_lower}–{ci_upper}; {null_median}]"
+            else:
+                df_summary.loc[0, clf] = f"{data_median} [{ci_lower}–{ci_upper}]"
+
+        df_summary.to_csv(
+            os.path.join(
+                output_dir, f"test-performance-table_{metric}_with-95ci_{timestamp}.csv"
+            )
+        )
+    return
 
 
 def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap=16):
@@ -28,8 +102,8 @@ def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap
         # if plot_top_n_shap != 1.0 but includes 1 (int)
         if plot_top_n_shap <= 0:
             raise ValueError(
-                "plot_top_n_shap should be a float between 0 and 1.0 or an "
-                "integer >= 1. You set to zero or negative."
+                """plot_top_n_shap should be a float between 0 and 1.0 or an
+                integer >= 1. You set to zero or negative."""
             )
         elif plot_top_n_shap < 1:
             plot_top_n_shap = int(np.round(plot_top_n_shap * num_features))
@@ -43,6 +117,7 @@ def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap
         yticklabels=True,
         cbar=False,
         square=True,
+        annot_kws={"size": 12},
     )
     hm.set_xticklabels(summary.columns, rotation=45)
     hm.set_yticklabels(summary.index, rotation=0)
@@ -116,14 +191,15 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
         }
         # this is key with shape (F, N) where F is feature_names, N is mean
         # shap values across splits
+
         # Obtain values for each bootstrapping split, then append summary
         # statistics to shaps_n_splits
         for split_i in range(n_splits):
             shaps_i = shaps[split_i]  # all shap values for this bootstrapping split
             y_true = y_true_and_preds[split_i][0]
             y_pred = y_true_and_preds[split_i][1]
-            # split_performance = accuracy_score(y_true, y_pred)
-            split_performance = explained_variance_score(y_true, y_pred)
+
+            split_performance = accuracy_score(y_true, y_pred)
 
             # split prediction indexes into TP, TN, FP, FN, good for error auditing
             indexes = {"tp": [], "tn": [], "fp": [], "fn": []}
@@ -138,13 +214,13 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
                     indexes["fn"].append(i)
             indexes_all[model_name].append(indexes)
 
-            #  For each quadrant, obtain F shap values for P predictions, take
-            #  the absolute mean weighted by performance across all predictions
+            #  For each quadrant, obtain F shap values for P predictions,
+            # take the absolute mean weighted by performance across all predictions
             for quadrant in ["tp", "tn", "fp", "fn"]:
                 if len(indexes.get(quadrant)) == 0:
                     warnings.warn(
-                        f"There were no {quadrant.upper()}s, this will output "
-                        "NaNs in the csv and figure for this split column"
+                        f"""There were no {quadrant.upper()}s, this will output NaNs
+                        in the csv and figure for this split column"""
                     )
                 shaps_i_quadrant = shaps_i[
                     indexes.get(quadrant)
@@ -214,10 +290,11 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
             "um": [],
             "up": [],
         }
-        # this is key with shape (F, N) where F is feature_names, N is mean
-        # shap values across splits
-        # Obtain values for each bootstrapping split, then append summary
-        # statistics to shaps_n_splits
+        #   this is key with shape (F, N) where F is feature_names,
+        #   N is mean shap values across splits
+
+        # Obtain values for each bootstrapping split,
+        # then append summary statistics to shaps_n_splits
         for split_i in range(n_splits):
             shaps_i = shaps[split_i]  # all shap values for this bootstrapping split
             y_true = y_true_and_preds[split_i][0]
@@ -239,13 +316,13 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
                     indexes["up"].append(i)
             indexes_all[model_name].append(indexes)
 
-            #  For each quadrant, obtain F shap values for P predictions, take
-            #  the absolute mean weighted by performance across all predictions
+            #  For each quadrant, obtain F shap values for P predictions,
+            #  take the absolute mean weighted by performance across all predictions
             for quadrant in ["lp", "lm", "um", "up"]:
                 if len(indexes.get(quadrant)) == 0:
                     warnings.warn(
-                        f"There were no {quadrant.upper()}s, this will output "
-                        "NaNs in the csv and figure for this split column"
+                        f"""There were no {quadrant.upper()}s, this will
+                        output NaNs in the csv and figure for this split column"""
                     )
                 shaps_i_quadrant = shaps_i[
                     indexes.get(quadrant)
@@ -254,8 +331,8 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
                 shaps_n_splits[quadrant].append(
                     np.mean(abs_weighted_shap_values, axis=0)
                 )
-            #  obtain F shap values for P predictions, take the absolute mean
-            #  weighted by performance across all predictions
+            #  obtain F shap values for P predictions, take the absolute mean weighted
+            #  by performance across all predictions
             abs_weighted_shap_values = np.abs(shaps_i) * split_performance
             shaps_n_splits["all"].append(np.mean(abs_weighted_shap_values, axis=0))
 
@@ -282,11 +359,27 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
     save_obj(indexes_all, shap_dir + "indexes_quadrant.pkl")
 
 
+def permutation_test_pvalue(mean_score, distribution):
+    """
+    the permutation-based empirical p-value from Test 1 in:
+    Ojala and Garriga. Permutation Tests for Studying
+    Classifier Performance. The Journal of Machine Learning
+    Research (2010) vol. 11
+    Based off of:
+    github.com/scikit-learn/scikit-learn/blob
+    /15a949460dbf19e5e196b8ef48f9712b72a3b3c3
+    /sklearn/model_selection/_validation.py#L1062
+    """
+
+    n_distribution = len(distribution)
+    pvalue = (np.sum(np.array(distribution) >= mean_score) + 1.0) / (n_distribution + 1)
+    return pvalue
+
+
 def compute_pairwise_stats(df):
-    """Run Wilcoxon signed rank tests across pairs of classifiers.
+    """Run permutation test p-value across pairs of classifiers.
 
     When comparing a classifier to itself, compare to its null distribution.
-    A one sided test is used.
 
     Assumes that the dataframe has three keys: Classifier, type, and score
     with type referring to either the data distribution or the null distribution
@@ -296,6 +389,7 @@ def compute_pairwise_stats(df):
     effects = np.zeros((N, N)) * np.nan
     pvalues = np.zeros((N, N)) * np.nan
     for idx1, group1 in enumerate(df.groupby("Classifier")):
+        # group1 is a model name (e.g., "SVC")
         filter = group1[1].apply(lambda x: x.type == "data", axis=1).values
         group1df = group1[1].iloc[filter, :]
         filter = group1[1].apply(lambda x: x.type == "null", axis=1).values
@@ -304,17 +398,18 @@ def compute_pairwise_stats(df):
             filter = group2[1].apply(lambda x: x.type == "data", axis=1).values
             group2df = group2[1].iloc[filter, :]
             if group1[0] != group2[0]:
-                stat, pval = wilcoxon(
-                    group1df["score"].values,
-                    group2df["score"].values,
-                    alternative="greater",
-                )
+                mean_score = np.mean(group1df["score"].values)
+                distribution = group2df["score"].values
+                pval = permutation_test_pvalue(mean_score, distribution)
+                stat = 0  # ToDo: compute effect size independent of permutation size
             else:
-                stat, pval = wilcoxon(
-                    group1df["score"].values,
-                    group1nulldf["score"].values,
-                    alternative="greater",
+                mean_score = np.mean(group1df["score"].values)
+                distribution = group1nulldf["score"].values
+                pval = permutation_test_pvalue(mean_score, distribution)
+                stat = (
+                    0  # ToDo: compute effect size independent of amount of permutations
                 )
+
             effects[idx1, idx2] = stat
             pvalues[idx1, idx2] = pval
     return effects, pvalues
@@ -353,6 +448,14 @@ def gen_report(
                     },
                     ignore_index=True,
                 )
+
+    # Generate table of median performance with 95% CI
+    # df_all = performance_table(results, prefix, output_dir, metrics, round_decimals=2)
+    performance_table(df, output_dir, round_decimals=2)
+
+    # Plot distribution of scores
+    import datetime
+
     order = [group[0] for group in df.groupby("Classifier")]
     for name, subdf in df.groupby("metric"):
         sns.set(style="whitegrid", palette="pastel", color_codes=True)
@@ -390,13 +493,14 @@ def gen_report(
             sns.set(style="whitegrid", palette="pastel", color_codes=True)
             sns.set_context("talk")
             plt.figure(figsize=(2 * len(order), 2 * len(order)))
-            # plt.figure(figsize=(8, 8))
             ax = sns.heatmap(
-                effects,
-                annot=np.fix(-np.log10(pvalues)),
+                pvalues
+                <= 0.05,  # ToDo: When effects has been implemented, set this to: effects
+                annot=pvalues.round(3),  # ToDo: When effects has been implemented,
+                # set this to: np.fix(-np.log10(pvalues))
                 yticklabels=order,
                 xticklabels=order,
-                cbar=True,
+                cbar=False,  # ToDo: When effects has been implemented, set this to: True
                 cbar_kws={"shrink": 0.7},
                 square=True,
             )

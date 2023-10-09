@@ -5,18 +5,18 @@ ci:
 
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
     -   id: check-added-large-files
     -   id: check-yaml
     -   id: end-of-file-fixer
     -   id: trailing-whitespace
 -   repo: https://github.com/psf/black
-    rev: 23.1.0
+    rev: 23.9.1
     hooks:
     -   id: black
 -   repo: https://github.com/PyCQA/flake8
-    rev: 6.0.0
+    rev: 6.1.0
     hooks:
     - id: flake8
       exclude: ^(pydra_ml/_version\.py|versioneer\.py)$
@@ -27,7 +27,7 @@ repos:
         args: ["--profile", "black"]
         exclude: ^(pydra_ml/_version\.py|versioneer\.py)$
 -   repo: https://github.com/codespell-project/codespell
-    rev: v2.2.2
+    rev: v2.2.6
     hooks:
     -   id: codespell
         exclude: ^(pydra_ml/_version\.py|versioneer\.py)$

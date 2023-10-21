@@ -12,8 +12,8 @@ jobs:
       fail-fast: true
       matrix:
         os:
-          - windows-2019
-          - ubuntu-20.04
+          - windows-latest
+          - ubuntu-latest
           - macos-latest
         python:
           - 3.8
@@ -22,11 +22,11 @@ jobs:
           - "3.11"
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:  # no need for the history
           fetch-depth: 1
       - name: Set up Python ${{ matrix.python }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python }}
 

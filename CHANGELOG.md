@@ -1,3 +1,31 @@
+# 0.6.0 (Sat Oct 21 2023)
+
+#### 🚀 Enhancement
+
+- Enh/proba [#57](https://github.com/nipype/pydra-ml/pull/57) ([@satra](https://github.com/satra) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]) [@claudia-liauw](https://github.com/claudia-liauw))
+
+#### 🐛 Bug Fix
+
+- [pre-commit.ci] pre-commit autoupdate [#51](https://github.com/nipype/pydra-ml/pull/51) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#50](https://github.com/nipype/pydra-ml/pull/50) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#49](https://github.com/nipype/pydra-ml/pull/49) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#48](https://github.com/nipype/pydra-ml/pull/48) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#47](https://github.com/nipype/pydra-ml/pull/47) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#46](https://github.com/nipype/pydra-ml/pull/46) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- [pre-commit.ci] pre-commit autoupdate [#45](https://github.com/nipype/pydra-ml/pull/45) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
+#### ⚠️ Pushed to `master`
+
+- update testing matrix ([@satra](https://github.com/satra))
+
+#### Authors: 3
+
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- Claudia ([@claudia-liauw](https://github.com/claudia-liauw))
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+
+---
+
 # 0.5.1 (Thu Aug 12 2021)
 
 #### 🐛 Bug Fix

@@ -114,7 +114,7 @@ will want to generate `x_indices` programmatically.
 - *n_splits*: Number of shuffle split iterations to use
 - *test_size*: Fraction of data to use for test set in each iteration
 - *clf_info*: List of scikit-learn classifiers to use.
-- *permute*: List of booleans to indicate whether to generate a null model or not
+- *permute*: List of booleans to indicate whether to generate a null model with permuted labels aka permutation test (set to true) or not (set to false)
 - *gen_feature_importance*: Boolean indicating whether unique feature importance method should be generated for each model if available (e.g., `coef_` for linear models, `feature_importances_` for tree-based models) *NOT FULLY TESTED: set to false*
 - *gen_permutation_importance*: Boolean indicating whether permutation_importance values are generated (model agnostic, available for all models) *NOT FULLY TESTED: set to false*
 - *gen_shap*: Boolean indicating whether shap values are generated (model agnostic, available for all models)

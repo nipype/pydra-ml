@@ -45,7 +45,8 @@ def performance_table(df, output_dir, round_decimals=2):
             os.path.join(
                 output_dir,
                 f"test-performance-table_{metric}_all-splits_{timestamp}.csv",
-            )
+            ),
+            float_format="%.2f",
         )
 
         # null
@@ -64,7 +65,7 @@ def performance_table(df, output_dir, round_decimals=2):
         # Save median score with median null score in square brackets as strings
 
         df_summary = pd.DataFrame(index=[0], columns=classifier_names)
-        df_summary[classifier_names] = np.zeros(len(classifier_names))
+        df_summary[classifier_names] = ""
 
         for clf in classifier_names:
             data_median = round(df_metric_data_clean_median[clf], round_decimals)
@@ -420,7 +421,7 @@ def gen_report(
 ):
     if len(results) == 0:
         raise ValueError("results is empty")
-    df = pd.DataFrame(columns=["metric", "score", "Classifier", "type"])
+    df = None
     for val in results:
         score = val[1].output.score
         if not isinstance(score, list):
@@ -439,15 +440,16 @@ def gen_report(
         permute = val[0][prefix + ".permute"]
         for scoreval in score:
             for idx, metric in enumerate(metrics):
-                df = df.append(
-                    {
-                        "Classifier": name,
-                        "type": "null" if permute else "data",
-                        "metric": metrics[idx],
-                        "score": scoreval[idx] if scoreval[idx] is not None else np.nan,
-                    },
-                    ignore_index=True,
-                )
+                new_row = {
+                    "Classifier": name,
+                    "type": "null" if permute else "data",
+                    "metric": metrics[idx],
+                    "score": scoreval[idx] if scoreval[idx] is not None else np.nan,
+                }
+                if df is None:
+                    df = pd.DataFrame([new_row])
+                else:
+                    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
     # Generate table of median performance with 95% CI
     # df_all = performance_table(results, prefix, output_dir, metrics, round_decimals=2)
@@ -472,6 +474,7 @@ def gen_report(
             order=order,
         )
         ax.xaxis.set_ticks_position("top")
+        ax.set_xticks(ax.get_xticks())
         ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="center")
         ax.set_ylabel(name)
         ax.legend(loc="center right", bbox_to_anchor=(1.2, 0.5), ncol=1)

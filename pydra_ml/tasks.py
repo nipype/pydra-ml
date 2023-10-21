@@ -19,7 +19,7 @@ def read_file(filename, x_indices=None, target_vars=None, group=None):
         X = data[x_indices]
     else:
         raise ValueError(f"{x_indices} is not a list of string or ints")
-    Y = data[target_vars]
+    Y = data[list(target_vars)]
     if group is None:
         groups = list(range(X.shape[0]))
     else:
@@ -100,7 +100,11 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
     else:
         pipe.fit(X[train_index], y[train_index])
     predicted = pipe.predict(X[test_index])
-    return (y[test_index], predicted), (pipe, train_index, test_index)
+    try:
+        predicted_proba = pipe.predict_proba(X[test_index])
+    except AttributeError:
+        predicted_proba = None
+    return (y[test_index], predicted, predicted_proba), (pipe, train_index, test_index)
 
 
 def calc_metric(output, metrics):
@@ -114,7 +118,11 @@ def calc_metric(output, metrics):
     for metric in metrics:
         metric_mod = __import__("sklearn.metrics", fromlist=[metric])
         metric_func = getattr(metric_mod, metric)
-        score.append(metric_func(output[0], output[1]))
+        if metric == "roc_auc_score" and output[2] is not None:
+            # For roc_auc_score, we need to pass the probability of the positive class
+            score.append(metric_func(output[0], output[2][:, 1]))
+        else:
+            score.append(metric_func(output[0], output[1]))
     return score, output
 
 

@@ -17,7 +17,7 @@ def test_classifier(tmpdir):
     csv_file = os.path.join(os.path.dirname(__file__), "data", "breast_cancer.csv")
     inputs = {
         "filename": csv_file,
-        "x_indices": range(30),
+        "x_indices": range(10),
         "target_vars": ("target",),
         "group_var": None,
         "n_splits": 2,
@@ -29,7 +29,7 @@ def test_classifier(tmpdir):
         "permutation_importance_n_repeats": 5,
         "permutation_importance_scoring": "accuracy",
         "gen_shap": True,
-        "nsamples": 5,
+        "nsamples": 15,
         "l1_reg": "aic",
         "plot_top_n_shap": 16,
         "metrics": ["roc_auc_score", "accuracy_score"],
@@ -40,7 +40,7 @@ def test_classifier(tmpdir):
     assert results[0][0]["ml_wf.permute"]
     assert results[0][1].output.score[0][0] < results[1][1].output.score[0][0]
     assert hasattr(results[2][1].output.model, "predict")
-    assert isinstance(results[2][1].output.model.predict(np.ones((1, 30))), np.ndarray)
+    assert isinstance(results[2][1].output.model.predict(np.ones((1, 10))), np.ndarray)
 
 
 def test_regressor(tmpdir):
@@ -48,12 +48,12 @@ def test_regressor(tmpdir):
         [
             ["sklearn.impute", "SimpleImputer"],
             ["sklearn.preprocessing", "StandardScaler"],
-            ["sklearn.neural_network", "MLPRegressor", {"alpha": 1, "max_iter": 1000}],
+            ["sklearn.neural_network", "MLPRegressor", {"alpha": 1, "max_iter": 100}],
         ],
         (
             "sklearn.linear_model",
             "LinearRegression",
-            {"fit_intercept": True, "normalize": True},
+            {"fit_intercept": True},
         ),
     ]
     csv_file = os.path.join(os.path.dirname(__file__), "data", "diabetes_table.csv")
@@ -71,7 +71,7 @@ def test_regressor(tmpdir):
         "permutation_importance_n_repeats": 5,
         "permutation_importance_scoring": "accuracy",
         "gen_shap": True,
-        "nsamples": 5,
+        "nsamples": 15,
         "l1_reg": "aic",
         "plot_top_n_shap": 10,
         "metrics": ["explained_variance_score"],

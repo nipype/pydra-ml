@@ -118,7 +118,7 @@ def calc_metric(output, metrics):
     for metric in metrics:
         metric_mod = __import__("sklearn.metrics", fromlist=[metric])
         metric_func = getattr(metric_mod, metric)
-        if metric == 'roc_auc_score' and output[2] is not None:
+        if metric == "roc_auc_score" and output[2] is not None:
             # For roc_auc_score, we need to pass the probability of the positive class
             score.append(metric_func(output[0], output[2][:, 1]))
         else:

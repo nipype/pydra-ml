@@ -46,7 +46,7 @@ def performance_table(df, output_dir, round_decimals=2):
                 output_dir,
                 f"test-performance-table_{metric}_all-splits_{timestamp}.csv",
             ),
-            float_format='%.2f'
+            float_format="%.2f",
         )
 
         # null
@@ -65,7 +65,7 @@ def performance_table(df, output_dir, round_decimals=2):
         # Save median score with median null score in square brackets as strings
 
         df_summary = pd.DataFrame(index=[0], columns=classifier_names)
-        df_summary[classifier_names] = ''
+        df_summary[classifier_names] = ""
 
         for clf in classifier_names:
             data_median = round(df_metric_data_clean_median[clf], round_decimals)

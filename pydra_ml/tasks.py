@@ -7,7 +7,7 @@ from sklearn.pipeline import Pipeline
 
 @register_serializer
 def bytes_repr_Pipeline(obj: Pipeline, cache: Cache):
-    yield cp.dump(obj)
+    yield cp.dumps(obj)
 
 
 def read_file(filename, x_indices=None, target_vars=None, group=None):

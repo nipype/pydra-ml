@@ -71,7 +71,7 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
         messengers=FileMessenger(),
         messenger_args={"message_dir": os.path.join(os.getcwd(), "messages")},
     )
-    wf.split(["clf_info", "permute"])
+    wf.split(clf_info=inputs["clf_info"], permute=inputs["permute"])
     wf.add(
         read_file_pdt(
             name="readcsv",
@@ -102,7 +102,7 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
             permute=wf.lzin.permute,
         )
     )
-    wf.fit_clf.split("split_index")
+    wf.fit_clf.split(split_index=wf.gensplit.lzout.split_indices)
     wf.add(
         calc_metric_pdt(
             name="metric", output=wf.fit_clf.lzout.output, metrics=wf.lzin.metrics

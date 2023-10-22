@@ -1,5 +1,14 @@
 #!/usr/bin/env python
 
+import cloudpickle as cp
+from pydra.utils.hash import Cache, register_serializer
+from sklearn.pipeline import Pipeline
+
+
+@register_serializer
+def bytes_repr_Pipeline(obj: Pipeline, cache: Cache):
+    yield cp.dump(obj)
+
 
 def read_file(filename, x_indices=None, target_vars=None, group=None):
     """Read a CSV data file
@@ -126,7 +135,27 @@ def calc_metric(output, metrics):
     return score, output
 
 
-def get_feature_importance(permute, model, gen_feature_importance=True):
+def get_feature_importance(
+    *,
+    permute: bool,
+    model: tuple[Pipeline, list, list],
+    gen_feature_importance: bool = True,
+):
+    """Compute feature importance for the model
+
+    Parameters
+    ----------
+    permute : bool
+        Whether or not to run the model in permuted mode
+    model : tuple(sklearn.pipeline.Pipeline, list, list)
+        The model to compute feature importance for
+    gen_feature_importance : bool
+        Whether or not to generate the feature importance
+    Returns
+    -------
+    list
+        List of feature importance
+    """
     if permute or not gen_feature_importance:
         return []
     pipeline, train_index, test_index = model
@@ -172,7 +201,7 @@ def get_feature_importance(permute, model, gen_feature_importance=True):
                 pipeline_steps.coefs_
                 pipeline_steps.coef_
 
-                Please add correct method in tasks.py or if inexistent,
+                Please add correct method in tasks.py or if non-existent,
                 set gen_feature_importance to false in the spec file.
 
                 This is the error that was returned by sklearn:\n\t{e}\n

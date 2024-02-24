@@ -36,4 +36,4 @@ jobs:
           pip install --upgrade --force-reinstall --no-cache-dir --editable=".[test]"
       - name: Test with pytest
         run: |
-          pytest pydra_ml/tests/test_classifier.py
+          pytest -sv pydra_ml/tests/test_classifier.py

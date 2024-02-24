@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import typing as ty
+
 from pydra.utils.hash import Cache, register_serializer
 from sklearn.pipeline import Pipeline
 
@@ -100,7 +102,7 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
 
     train_index, test_index = train_test_split[split_index]
     y = y.ravel()
-    if type(X[0][0]) == str:
+    if type(X[0][0]) is str:
         # it's loaded as bytes, so we need to decode as utf-8
         X = np.array([str.encode(n[0]).decode("utf-8") for n in X])
     if permute:
@@ -137,7 +139,7 @@ def calc_metric(output, metrics):
 def get_feature_importance(
     *,
     permute: bool,
-    model: tuple[Pipeline, list, list],
+    model: ty.Tuple[Pipeline, list, list],
     gen_feature_importance: bool = True,
 ):
     """Compute feature importance for the model

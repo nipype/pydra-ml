@@ -1,3 +1,27 @@
+# 0.7.0 (Sat Feb 24 2024)
+
+#### 🚀 Enhancement
+
+- update release workflows [#62](https://github.com/nipype/pydra-ml/pull/62) ([@satra](https://github.com/satra))
+- initial attempt to work with pydra 0.23+ [#59](https://github.com/nipype/pydra-ml/pull/59) ([@satra](https://github.com/satra) [@tclose](https://github.com/tclose) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
+#### 🐛 Bug Fix
+
+- [pre-commit.ci] pre-commit autoupdate [#60](https://github.com/nipype/pydra-ml/pull/60) ([@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+- Enh/pydra23 toms [#61](https://github.com/nipype/pydra-ml/pull/61) ([@tclose](https://github.com/tclose) [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot]))
+
+#### ⚠️ Pushed to `master`
+
+- Update ci.yml ([@satra](https://github.com/satra))
+
+#### Authors: 3
+
+- [@pre-commit-ci[bot]](https://github.com/pre-commit-ci[bot])
+- Satrajit Ghosh ([@satra](https://github.com/satra))
+- Tom Close ([@tclose](https://github.com/tclose))
+
+---
+
 # 0.6.0 (Sat Oct 21 2023)
 
 #### 🚀 Enhancement

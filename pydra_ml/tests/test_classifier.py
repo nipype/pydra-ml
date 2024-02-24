@@ -1,5 +1,4 @@
 import os
-
 import numpy as np
 
 from ..classifier import gen_workflow, run_workflow
@@ -35,7 +34,7 @@ def test_classifier(tmpdir):
         "metrics": ["roc_auc_score", "accuracy_score"],
     }
     wf = gen_workflow(inputs, cache_dir=tmpdir)
-    results = run_workflow(wf, "cf", {"n_procs": 1})
+    results = run_workflow(wf, "serial", {"n_procs": 1})
     assert results[0][0]["ml_wf.clf_info"][1] == "MLPClassifier"
     assert results[0][0]["ml_wf.permute"]
     assert results[0][1].output.score[0][0] < results[1][1].output.score[0][0]

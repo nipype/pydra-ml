@@ -223,7 +223,7 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
                         f"""There were no {quadrant.upper()}s, this will output NaNs
                         in the csv and figure for this split column"""
                     )
-                shaps_i_quadrant = shaps_i[
+                shaps_i_quadrant = np.array(shaps_i)[
                     indexes.get(quadrant)
                 ]  # shape (P, F) P prediction x F feature_names
                 abs_weighted_shap_values = np.abs(shaps_i_quadrant) * split_performance
@@ -325,7 +325,7 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
                         f"""There were no {quadrant.upper()}s, this will
                         output NaNs in the csv and figure for this split column"""
                     )
-                shaps_i_quadrant = shaps_i[
+                shaps_i_quadrant = np.array(shaps_i)[
                     indexes.get(quadrant)
                 ]  # shape (P, F) P prediction x F feature_names
                 abs_weighted_shap_values = np.abs(shaps_i_quadrant) * split_performance

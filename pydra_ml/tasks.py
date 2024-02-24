@@ -254,7 +254,9 @@ def get_shap(X, permute, model, gen_shap=False, nsamples="auto", l1_reg="aic"):
     import shap
 
     explainer = shap.KernelExplainer(pipe.predict, shap.kmeans(X[train_index], 5))
-    shaps = explainer.shap_values(X[test_index], nsamples=nsamples, l1_reg=l1_reg)
+    shaps = explainer.shap_values(
+        X[test_index], nsamples=nsamples, l1_reg=l1_reg, silent=True
+    )
     return shaps
 
 

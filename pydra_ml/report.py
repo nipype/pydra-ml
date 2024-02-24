@@ -3,11 +3,14 @@ import os
 import pickle
 import warnings
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from sklearn.metrics import accuracy_score, explained_variance_score
+
+matplotlib.use("Agg")
 
 
 def save_obj(obj, path):

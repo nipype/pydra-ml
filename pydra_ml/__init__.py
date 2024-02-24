@@ -35,3 +35,7 @@ lgr = get_logger()
 set_logger_level(lgr, os.environ.get("PYDRAML_LOG_LEVEL", logging.INFO))
 FORMAT = "%(asctime)-15s [%(levelname)8s] %(message)s"
 logging.basicConfig(format=FORMAT)
+
+from . import _version
+
+__version__ = _version.get_versions()["version"]

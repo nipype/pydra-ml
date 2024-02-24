@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 
-import cloudpickle as cp
 from pydra.utils.hash import Cache, register_serializer
 from sklearn.pipeline import Pipeline
 
 
 @register_serializer
 def bytes_repr_Pipeline(obj: Pipeline, cache: Cache):
-    yield cp.dumps(obj)
+    yield str(obj).encode()
 
 
 def read_file(filename, x_indices=None, target_vars=None, group=None):

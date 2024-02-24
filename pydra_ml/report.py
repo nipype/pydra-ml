@@ -3,11 +3,14 @@ import os
 import pickle
 import warnings
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from sklearn.metrics import accuracy_score, explained_variance_score
+
+matplotlib.use("Agg")
 
 
 def save_obj(obj, path):
@@ -97,9 +100,9 @@ def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap
     # plot without all bootstrapping values
     summary = summary[["mean", "std", "min", "max"]]
     num_features = len(list(summary.index))
-    if (plot_top_n_shap != 1 and type(plot_top_n_shap) == float) or type(
+    if (plot_top_n_shap != 1 and type(plot_top_n_shap) is float) or type(
         plot_top_n_shap
-    ) == int:
+    ) is int:
         # if plot_top_n_shap != 1.0 but includes 1 (int)
         if plot_top_n_shap <= 0:
             raise ValueError(
@@ -223,7 +226,7 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
                         f"""There were no {quadrant.upper()}s, this will output NaNs
                         in the csv and figure for this split column"""
                     )
-                shaps_i_quadrant = shaps_i[
+                shaps_i_quadrant = np.array(shaps_i)[
                     indexes.get(quadrant)
                 ]  # shape (P, F) P prediction x F feature_names
                 abs_weighted_shap_values = np.abs(shaps_i_quadrant) * split_performance
@@ -325,7 +328,7 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
                         f"""There were no {quadrant.upper()}s, this will
                         output NaNs in the csv and figure for this split column"""
                     )
-                shaps_i_quadrant = shaps_i[
+                shaps_i_quadrant = np.array(shaps_i)[
                     indexes.get(quadrant)
                 ]  # shape (P, F) P prediction x F feature_names
                 abs_weighted_shap_values = np.abs(shaps_i_quadrant) * split_performance

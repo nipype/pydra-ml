@@ -37,9 +37,9 @@ def performance_table(df, output_dir, round_decimals=2):
             df_clf = df_clf.reset_index(drop=True)
             df_metric_data_clean[clf] = df_clf
         df_metric_data_clean_median = df_metric_data_clean.median().T
-        df_metric_data_clean.loc[
-            len(df_metric_data_clean)
-        ] = df_metric_data_clean_median
+        df_metric_data_clean.loc[len(df_metric_data_clean)] = (
+            df_metric_data_clean_median
+        )
         df_metric_data_clean.index = list(df_metric_data_clean.index[:-1]) + ["median"]
         df_metric_data_clean.to_csv(
             os.path.join(
@@ -77,9 +77,9 @@ def performance_table(df, output_dir, round_decimals=2):
             )
             if "null" in df_metric.type.unique():
                 null_median = round(df_metric_null_clean_median[clf], 2)
-                df_summary.loc[
-                    0, clf
-                ] = f"{data_median} [{ci_lower}–{ci_upper}; {null_median}]"
+                df_summary.loc[0, clf] = (
+                    f"{data_median} [{ci_lower}–{ci_upper}; {null_median}]"
+                )
             else:
                 df_summary.loc[0, clf] = f"{data_median} [{ci_lower}–{ci_upper}]"
 

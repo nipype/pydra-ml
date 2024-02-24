@@ -97,9 +97,9 @@ def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap
     # plot without all bootstrapping values
     summary = summary[["mean", "std", "min", "max"]]
     num_features = len(list(summary.index))
-    if (plot_top_n_shap != 1 and type(plot_top_n_shap) == float) or type(
+    if (plot_top_n_shap != 1 and type(plot_top_n_shap) is float) or type(
         plot_top_n_shap
-    ) == int:
+    ) is int:
         # if plot_top_n_shap != 1.0 but includes 1 (int)
         if plot_top_n_shap <= 0:
             raise ValueError(

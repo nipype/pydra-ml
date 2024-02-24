@@ -1,5 +1,15 @@
 #!/usr/bin/env python
 
+import typing as ty
+
+from pydra.utils.hash import Cache, register_serializer
+from sklearn.pipeline import Pipeline
+
+
+@register_serializer
+def bytes_repr_Pipeline(obj: Pipeline, cache: Cache):
+    yield str(obj).encode()
+
 
 def read_file(filename, x_indices=None, target_vars=None, group=None):
     """Read a CSV data file
@@ -92,7 +102,7 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
 
     train_index, test_index = train_test_split[split_index]
     y = y.ravel()
-    if type(X[0][0]) == str:
+    if type(X[0][0]) is str:
         # it's loaded as bytes, so we need to decode as utf-8
         X = np.array([str.encode(n[0]).decode("utf-8") for n in X])
     if permute:
@@ -126,7 +136,27 @@ def calc_metric(output, metrics):
     return score, output
 
 
-def get_feature_importance(permute, model, gen_feature_importance=True):
+def get_feature_importance(
+    *,
+    permute: bool,
+    model: ty.Tuple[Pipeline, list, list],
+    gen_feature_importance: bool = True,
+):
+    """Compute feature importance for the model
+
+    Parameters
+    ----------
+    permute : bool
+        Whether or not to run the model in permuted mode
+    model : tuple(sklearn.pipeline.Pipeline, list, list)
+        The model to compute feature importance for
+    gen_feature_importance : bool
+        Whether or not to generate the feature importance
+    Returns
+    -------
+    list
+        List of feature importance
+    """
     if permute or not gen_feature_importance:
         return []
     pipeline, train_index, test_index = model
@@ -172,7 +202,7 @@ def get_feature_importance(permute, model, gen_feature_importance=True):
                 pipeline_steps.coefs_
                 pipeline_steps.coef_
 
-                Please add correct method in tasks.py or if inexistent,
+                Please add correct method in tasks.py or if non-existent,
                 set gen_feature_importance to false in the spec file.
 
                 This is the error that was returned by sklearn:\n\t{e}\n
@@ -224,7 +254,9 @@ def get_shap(X, permute, model, gen_shap=False, nsamples="auto", l1_reg="aic"):
     import shap
 
     explainer = shap.KernelExplainer(pipe.predict, shap.kmeans(X[train_index], 5))
-    shaps = explainer.shap_values(X[test_index], nsamples=nsamples, l1_reg=l1_reg)
+    shaps = explainer.shap_values(
+        X[test_index], nsamples=nsamples, l1_reg=l1_reg, silent=True
+    )
     return shaps
 
 

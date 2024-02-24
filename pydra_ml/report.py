@@ -3,11 +3,14 @@ import os
 import pickle
 import warnings
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from sklearn.metrics import accuracy_score, explained_variance_score
+
+matplotlib.use("Agg")
 
 
 def save_obj(obj, path):
@@ -37,9 +40,9 @@ def performance_table(df, output_dir, round_decimals=2):
             df_clf = df_clf.reset_index(drop=True)
             df_metric_data_clean[clf] = df_clf
         df_metric_data_clean_median = df_metric_data_clean.median().T
-        df_metric_data_clean.loc[
-            len(df_metric_data_clean)
-        ] = df_metric_data_clean_median
+        df_metric_data_clean.loc[len(df_metric_data_clean)] = (
+            df_metric_data_clean_median
+        )
         df_metric_data_clean.index = list(df_metric_data_clean.index[:-1]) + ["median"]
         df_metric_data_clean.to_csv(
             os.path.join(
@@ -77,9 +80,9 @@ def performance_table(df, output_dir, round_decimals=2):
             )
             if "null" in df_metric.type.unique():
                 null_median = round(df_metric_null_clean_median[clf], 2)
-                df_summary.loc[
-                    0, clf
-                ] = f"{data_median} [{ci_lower}–{ci_upper}; {null_median}]"
+                df_summary.loc[0, clf] = (
+                    f"{data_median} [{ci_lower}–{ci_upper}; {null_median}]"
+                )
             else:
                 df_summary.loc[0, clf] = f"{data_median} [{ci_lower}–{ci_upper}]"
 
@@ -97,9 +100,9 @@ def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap
     # plot without all bootstrapping values
     summary = summary[["mean", "std", "min", "max"]]
     num_features = len(list(summary.index))
-    if (plot_top_n_shap != 1 and type(plot_top_n_shap) == float) or type(
+    if (plot_top_n_shap != 1 and type(plot_top_n_shap) is float) or type(
         plot_top_n_shap
-    ) == int:
+    ) is int:
         # if plot_top_n_shap != 1.0 but includes 1 (int)
         if plot_top_n_shap <= 0:
             raise ValueError(
@@ -223,7 +226,7 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
                         f"""There were no {quadrant.upper()}s, this will output NaNs
                         in the csv and figure for this split column"""
                     )
-                shaps_i_quadrant = shaps_i[
+                shaps_i_quadrant = np.array(shaps_i)[
                     indexes.get(quadrant)
                 ]  # shape (P, F) P prediction x F feature_names
                 abs_weighted_shap_values = np.abs(shaps_i_quadrant) * split_performance
@@ -325,7 +328,7 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
                         f"""There were no {quadrant.upper()}s, this will
                         output NaNs in the csv and figure for this split column"""
                     )
-                shaps_i_quadrant = shaps_i[
+                shaps_i_quadrant = np.array(shaps_i)[
                     indexes.get(quadrant)
                 ]  # shape (P, F) P prediction x F feature_names
                 abs_weighted_shap_values = np.abs(shaps_i_quadrant) * split_performance

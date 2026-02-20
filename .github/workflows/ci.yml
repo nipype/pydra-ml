@@ -28,6 +28,8 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Install dependencies
-        run: uv pip install --system --pre -e ".[test]"
+        run: |
+          uv venv
+          uv pip install --pre -e ".[test]"
       - name: Test with pytest
         run: uv run pytest pydra_ml/tests/test_classifier.py -s

@@ -24,8 +24,7 @@ def performance_table(df, output_dir, round_decimals=2):
     output_dir = output_dir + f"performance_table-{timestamp}/"
     os.mkdir(output_dir)
 
-    classifier_names = df.Classifier.unique()
-    classifier_names.sort()
+    classifier_names = sorted(df.Classifier.unique())
 
     for idx, metric in enumerate(df.metric.unique()):
         df_metric = df[df.metric == metric]

@@ -17,7 +17,7 @@ def test_classifier(tmpdir):
     csv_file = os.path.join(os.path.dirname(__file__), "data", "breast_cancer.csv")
     inputs = {
         "filename": csv_file,
-        "x_indices": range(10),
+        "x_indices": list(range(10)),
         "target_vars": ("target",),
         "group_var": None,
         "n_splits": 2,
@@ -34,13 +34,16 @@ def test_classifier(tmpdir):
         "plot_top_n_shap": 16,
         "metrics": ["roc_auc_score", "accuracy_score"],
     }
-    wf = gen_workflow(inputs, cache_dir=tmpdir)
-    results = run_workflow(wf, "cf", {"n_procs": 1})
-    assert results[0][0]["ml_wf.clf_info"][1] == "MLPClassifier"
-    assert results[0][0]["ml_wf.permute"]
-    assert results[0][1].output.score[0][0] < results[1][1].output.score[0][0]
-    assert hasattr(results[2][1].output.model, "predict")
-    assert isinstance(results[2][1].output.model.predict(np.ones((1, 10))), np.ndarray)
+    spec = gen_workflow(inputs, cache_dir=tmpdir)
+    result = run_workflow(spec, "debug", {})
+    # 4 outer combinations (outer-product split): (MLP,True), (MLP,False), (Pipeline,True), (Pipeline,False)
+    # score[i] is a list of per-split metric lists, score[i][j][k] = combination i, split j, metric k
+    permuted_auc = result.outputs.score[0][0][0]
+    real_auc = result.outputs.score[1][0][0]
+    assert permuted_auc < real_auc
+    # MLP non-permuted final model (combination 1) should be a fitted pipeline
+    assert hasattr(result.outputs.model[1], "predict")
+    assert isinstance(result.outputs.model[1].predict(np.ones((1, 10))), np.ndarray)
 
 
 def test_regressor(tmpdir):
@@ -77,10 +80,12 @@ def test_regressor(tmpdir):
         "metrics": ["explained_variance_score"],
     }
 
-    wf = gen_workflow(inputs, cache_dir=tmpdir)
-    results = run_workflow(wf, "cf", {"n_procs": 1})
-    assert results[0][0]["ml_wf.clf_info"][-1][1] == "MLPRegressor"
-    assert results[0][0]["ml_wf.permute"]
-    assert results[0][1].output.score[0][0] < results[1][1].output.score[0][0]
-    assert hasattr(results[2][1].output.model, "predict")
-    assert isinstance(results[2][1].output.model.predict(np.ones((1, 10))), np.ndarray)
+    spec = gen_workflow(inputs, cache_dir=tmpdir)
+    result = run_workflow(spec, "debug", {})
+    # 4 outer combinations: (Pipeline,True), (Pipeline,False), (LinearRegression,True), (LinearRegression,False)
+    permuted_ev = result.outputs.score[0][0][0]
+    real_ev = result.outputs.score[1][0][0]
+    assert permuted_ev < real_ev
+    # Pipeline non-permuted final model (combination 1)
+    assert hasattr(result.outputs.model[1], "predict")
+    assert isinstance(result.outputs.model[1].predict(np.ones((1, 10))), np.ndarray)

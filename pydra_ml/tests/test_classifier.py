@@ -27,20 +27,20 @@ def test_classifier(tmpdir):
         "gen_feature_importance": False,
         "gen_permutation_importance": False,
         "permutation_importance_n_repeats": 5,
-        "permutation_importance_scoring": "accuracy",
+        "permutation_importance_scoring": "balanced_accuracy",
         "gen_shap": True,
         "nsamples": 15,
         "l1_reg": "aic",
         "plot_top_n_shap": 16,
-        "metrics": ["roc_auc_score", "accuracy_score"],
+        "metrics": ["balanced_accuracy_score"],
     }
     spec = gen_workflow(inputs, cache_dir=tmpdir)
     result = run_workflow(spec, "debug", {})
     # 4 outer combinations (outer-product split): (MLP,True), (MLP,False), (Pipeline,True), (Pipeline,False)
     # score[i] is a list of per-split metric lists, score[i][j][k] = combination i, split j, metric k
-    permuted_auc = result.outputs.score[0][0][0]
-    real_auc = result.outputs.score[1][0][0]
-    assert permuted_auc < real_auc
+    permuted_ba = result.outputs.score[0][0][0]
+    real_ba = result.outputs.score[1][0][0]
+    assert permuted_ba < real_ba
     # MLP non-permuted final model (combination 1) should be a fitted pipeline
     assert hasattr(result.outputs.model[1], "predict")
     assert isinstance(result.outputs.model[1].predict(np.ones((1, 10))), np.ndarray)
@@ -71,20 +71,20 @@ def test_classifier_imbalanced(tmpdir):
         "gen_feature_importance": False,
         "gen_permutation_importance": False,
         "permutation_importance_n_repeats": 5,
-        "permutation_importance_scoring": "accuracy",
+        "permutation_importance_scoring": "balanced_accuracy",
         "gen_shap": False,
         "nsamples": 15,
         "l1_reg": "aic",
         "plot_top_n_shap": 16,
-        "metrics": ["roc_auc_score", "accuracy_score"],
+        "metrics": ["balanced_accuracy_score"],
     }
     spec = gen_workflow(inputs, cache_dir=tmpdir)
     result = run_workflow(spec, "debug", {})
     # 2 outer combinations: (MLP,True), (MLP,False)
-    permuted_auc = result.outputs.score[0][0][0]
-    real_auc = result.outputs.score[1][0][0]
-    assert real_auc > 0.5, f"AUC should be above chance, got {real_auc}"
-    assert permuted_auc < real_auc
+    permuted_ba = result.outputs.score[0][0][0]
+    real_ba = result.outputs.score[1][0][0]
+    assert real_ba > 0.5, f"balanced accuracy should be above chance, got {real_ba}"
+    assert permuted_ba < real_ba
 
 
 def test_regressor_imbalanced(tmpdir):

@@ -11,6 +11,17 @@ def bytes_repr_Pipeline(obj: Pipeline, cache: Cache):
     yield str(obj).encode()
 
 
+try:
+    from imblearn.pipeline import Pipeline as ImbPipeline
+
+    @register_serializer
+    def bytes_repr_ImbPipeline(obj: ImbPipeline, cache: Cache):
+        yield str(obj).encode()
+
+except ImportError:
+    pass
+
+
 def read_file(filename, x_indices=None, target_vars=None, group=None):
     """Read a CSV data file
 
@@ -38,30 +49,106 @@ def read_file(filename, x_indices=None, target_vars=None, group=None):
     return X.values, Y.values, groups, feature_names
 
 
-def gen_splits(n_splits, test_size, X, Y, groups=None, random_state=0):
+def gen_splits(
+    n_splits,
+    test_size,
+    X,
+    Y,
+    groups=None,
+    random_state=0,
+    bootstrap_strategy="group_shuffle",
+    n_bins=10,
+):
     """Generate train-test splits for the data.
 
-    Uses GroupShuffleSplit from scikit-learn
+    Uses GroupShuffleSplit (default), StratifiedShuffleSplit, or
+    stratified-regression (quantile-binned StratifiedShuffleSplit).
 
     :param n_splits: Number of splits
     :param test_size: fractional test size
     :param X: Sample feature data
     :param Y: Sample target data
-    :param groups: Grouping of sample data for shufflesplit
+    :param groups: Grouping of sample data for shufflesplit (ignored for stratified strategies)
     :param random_state: randomization for shuffling (default 0)
+    :param bootstrap_strategy: "group_shuffle" (default), "stratified", or
+        "stratified_regression" (bins continuous Y into n_bins quantile bins then
+        stratifies on those bins to ensure each split covers the full target range)
+    :param n_bins: Number of quantile bins used by "stratified_regression" (default 10)
     :return: splits and indices to splits
     """
-    from sklearn.model_selection import GroupShuffleSplit
+    if bootstrap_strategy == "stratified":
+        from sklearn.model_selection import StratifiedShuffleSplit
 
-    gss = GroupShuffleSplit(
-        n_splits=n_splits, test_size=test_size, random_state=random_state
-    )
-    train_test_splits = list(gss.split(X, Y, groups=groups))
+        splitter = StratifiedShuffleSplit(
+            n_splits=n_splits, test_size=test_size, random_state=random_state
+        )
+        train_test_splits = list(splitter.split(X, Y.ravel()))
+    elif bootstrap_strategy == "stratified_regression":
+        from sklearn.model_selection import StratifiedShuffleSplit
+        from sklearn.preprocessing import KBinsDiscretizer
+
+        kbd = KBinsDiscretizer(n_bins=n_bins, encode="ordinal", strategy="quantile")
+        y_binned = kbd.fit_transform(Y.ravel().reshape(-1, 1)).ravel().astype(int)
+        splitter = StratifiedShuffleSplit(
+            n_splits=n_splits, test_size=test_size, random_state=random_state
+        )
+        train_test_splits = list(splitter.split(X, y_binned))
+    else:
+        from sklearn.model_selection import GroupShuffleSplit
+
+        splitter = GroupShuffleSplit(
+            n_splits=n_splits, test_size=test_size, random_state=random_state
+        )
+        train_test_splits = list(splitter.split(X, Y, groups=groups))
     split_indices = list(range(n_splits))
     return train_test_splits, split_indices
 
 
-def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
+def _resample_for_regression(X_train, y_train, balancing, balancing_bins):
+    """Resample regression training data by binning the continuous target.
+
+    Bins y_train into quantile bins, applies an imblearn resampler using the
+    binned labels, then recovers continuous y values via 1-NN lookup.  For
+    under-sampled rows (exact copies of originals) k=1 NN returns the exact
+    original y value.  For over-sampled synthetic rows the nearest original
+    neighbour's y value is used as an approximation.
+
+    :param X_train: training feature matrix
+    :param y_train: continuous training target (1-D)
+    :param balancing: imblearn resampler spec [module, class, {params}]
+    :param balancing_bins: number of quantile bins for discretising y_train
+    :return: (X_resampled, y_resampled)
+    """
+    from sklearn.neighbors import KNeighborsRegressor
+    from sklearn.preprocessing import KBinsDiscretizer
+
+    kbd = KBinsDiscretizer(n_bins=balancing_bins, encode="ordinal", strategy="quantile")
+    y_binned = kbd.fit_transform(y_train.reshape(-1, 1)).ravel().astype(int)
+
+    mod = __import__(balancing[0], fromlist=[balancing[1]])
+    params = balancing[2] if len(balancing) > 2 else {}
+    resampler = getattr(mod, balancing[1])(**params)
+    X_res, _ = resampler.fit_resample(X_train, y_binned)
+
+    # Recover continuous y values.
+    # k=1 NN on the original feature space: kept originals map to themselves
+    # exactly; synthetic points get their nearest original neighbour's y value.
+    knn = KNeighborsRegressor(n_neighbors=1)
+    knn.fit(X_train, y_train)
+    y_res = knn.predict(X_res)
+    return X_res, y_res
+
+
+def train_test_kernel(
+    X,
+    y,
+    train_test_split,
+    split_index,
+    clf_info,
+    permute,
+    balancing=None,
+    balancing_bins=None,
+):
     """Core model fitting and predicting function
 
     :param X: Input features
@@ -70,6 +157,11 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
     :param split_index: which index to use
     :param clf_info: how to construct the classifier
     :param permute: whether to run it in permuted mode or not
+    :param balancing: optional imblearn resampler spec [module, class, {params}]
+    :param balancing_bins: if set, enables regression-aware resampling — the
+        resampler is applied pre-fit on binned y (not inside the pipeline) and
+        continuous y values are recovered via 1-NN.  When None and balancing is
+        set, the resampler is inserted into an imblearn Pipeline (classification).
     :return: outputs, trained classifier with sample indices
     """
     import numpy as np
@@ -87,28 +179,64 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
             clf = GridSearchCV(clf, param_grid=clf_info[3])
         return clf
 
-    if isinstance(clf_info[0], list):
-        # Process as a pipeline constructor
-        steps = []
-        for val in clf_info:
-            step = to_instance(val)
-            steps.append((val[1], step))
-        pipe = Pipeline(steps)
-    else:
-        clf = to_instance(clf_info)
-        from sklearn.preprocessing import StandardScaler
+    def _is_imblearn(info):
+        return info[0].startswith("imblearn")
 
-        pipe = Pipeline([("std", StandardScaler()), (clf_info[1], clf)])
+    def _make_pipeline(steps, use_imblearn):
+        if use_imblearn:
+            from imblearn.pipeline import Pipeline as ImbPipeline
+
+            return ImbPipeline(steps)
+        return Pipeline(steps)
 
     train_index, test_index = train_test_split[split_index]
     y = y.ravel()
     if type(X[0][0]) is str:
         # it's loaded as bytes, so we need to decode as utf-8
         X = np.array([str.encode(n[0]).decode("utf-8") for n in X])
-    if permute:
-        pipe.fit(X[train_index], y[np.random.permutation(train_index)])
+
+    if balancing is not None and balancing_bins is not None:
+        # Regression resampling: resample training data before fitting.
+        # The pipeline is built without a balancing step (resampling is pre-fit).
+        X_fit, y_fit = _resample_for_regression(
+            X[train_index], y[train_index], balancing, balancing_bins
+        )
+        if isinstance(clf_info[0], list):
+            use_imblearn = any(_is_imblearn(val) for val in clf_info)
+            steps = [(val[1], to_instance(val)) for val in clf_info]
+            pipe = _make_pipeline(steps, use_imblearn)
+        else:
+            clf = to_instance(clf_info)
+            from sklearn.preprocessing import StandardScaler
+
+            pipe = Pipeline([("std", StandardScaler()), (clf_info[1], clf)])
     else:
-        pipe.fit(X[train_index], y[train_index])
+        X_fit, y_fit = X[train_index], y[train_index]
+        # Classification resampling: insert balancing step into imblearn Pipeline.
+        if isinstance(clf_info[0], list):
+            use_imblearn = any(_is_imblearn(val) for val in clf_info)
+            steps = [(val[1], to_instance(val)) for val in clf_info]
+            if balancing is not None:
+                use_imblearn = True
+                steps.insert(-1, (balancing[1], to_instance(balancing)))
+            pipe = _make_pipeline(steps, use_imblearn)
+        else:
+            clf = to_instance(clf_info)
+            from sklearn.preprocessing import StandardScaler
+
+            steps = [("std", StandardScaler())]
+            if balancing is not None:
+                steps.append((balancing[1], to_instance(balancing)))
+                use_imblearn = True
+            else:
+                use_imblearn = False
+            steps.append((clf_info[1], clf))
+            pipe = _make_pipeline(steps, use_imblearn)
+
+    if permute:
+        pipe.fit(X_fit, y_fit[np.random.permutation(range(len(y_fit)))])
+    else:
+        pipe.fit(X_fit, y_fit)
     predicted = pipe.predict(X[test_index])
     try:
         predicted_proba = pipe.predict_proba(X[test_index])
@@ -160,7 +288,7 @@ def get_feature_importance(
     if permute or not gen_feature_importance:
         return []
     pipeline, train_index, test_index = model
-    pipeline_steps = pipeline.steps[1][1]
+    pipeline_steps = pipeline.steps[-1][1]
     model_name = str(pipeline_steps)
     # Each model type may have a different method or none at all.
     # See here for sklearn models: https://scikit-learn.org/stable/supervised_learning.html
@@ -194,7 +322,7 @@ def get_feature_importance(
                 could not be computed and will be returned as an empty list
                 because after running this
 
-                pipeline_steps = pipeline.steps[1][1]
+                pipeline_steps = pipeline.steps[-1][1]
 
                 none of the following methods worked:
 
@@ -227,7 +355,7 @@ def get_permutation_importance(
 
     pipe, train_index, test_index = model
     results = permutation_importance(
-        pipe.steps[1][1],
+        pipe.steps[-1][1],
         X[test_index],
         y[test_index],
         scoring=permutation_importance_scoring,
@@ -260,13 +388,16 @@ def get_shap(X, permute, model, gen_shap=False, nsamples="auto", l1_reg="aic"):
     return shaps
 
 
-def create_model(X, y, clf_info, permute):
+def create_model(X, y, clf_info, permute, balancing=None, balancing_bins=None):
     """Train a model with all the data
 
     :param X: Input features
     :param y: Target variables
     :param clf_info: how to construct the classifier
     :param permute: whether to run it in permuted mode or not
+    :param balancing: optional imblearn resampler spec [module, class, {params}]
+    :param balancing_bins: if set, enables regression-aware resampling (see
+        train_test_kernel for details)
     :return: training error, classifier
     """
     import numpy as np
@@ -284,23 +415,55 @@ def create_model(X, y, clf_info, permute):
             clf = GridSearchCV(clf, param_grid=clf_info[3])
         return clf
 
-    if isinstance(clf_info[0], list):
-        # Process as a pipeline constructor
-        steps = []
-        for val in clf_info:
-            step = to_instance(val)
-            steps.append((val[1], step))
-        pipe = Pipeline(steps)
-    else:
-        clf = to_instance(clf_info)
-        from sklearn.preprocessing import StandardScaler
+    def _is_imblearn(info):
+        return info[0].startswith("imblearn")
 
-        pipe = Pipeline([("std", StandardScaler()), (clf_info[1], clf)])
+    def _make_pipeline(steps, use_imblearn):
+        if use_imblearn:
+            from imblearn.pipeline import Pipeline as ImbPipeline
+
+            return ImbPipeline(steps)
+        return Pipeline(steps)
 
     y = y.ravel()
-    if permute:
-        pipe.fit(X, y[np.random.permutation(range(len(y)))])
+
+    if balancing is not None and balancing_bins is not None:
+        # Regression resampling: resample all data before fitting.
+        X_fit, y_fit = _resample_for_regression(X, y, balancing, balancing_bins)
+        if isinstance(clf_info[0], list):
+            use_imblearn = any(_is_imblearn(val) for val in clf_info)
+            steps = [(val[1], to_instance(val)) for val in clf_info]
+            pipe = _make_pipeline(steps, use_imblearn)
+        else:
+            clf = to_instance(clf_info)
+            from sklearn.preprocessing import StandardScaler
+
+            pipe = Pipeline([("std", StandardScaler()), (clf_info[1], clf)])
     else:
-        pipe.fit(X, y)
+        X_fit, y_fit = X, y
+        if isinstance(clf_info[0], list):
+            use_imblearn = any(_is_imblearn(val) for val in clf_info)
+            steps = [(val[1], to_instance(val)) for val in clf_info]
+            if balancing is not None:
+                use_imblearn = True
+                steps.insert(-1, (balancing[1], to_instance(balancing)))
+            pipe = _make_pipeline(steps, use_imblearn)
+        else:
+            clf = to_instance(clf_info)
+            from sklearn.preprocessing import StandardScaler
+
+            steps = [("std", StandardScaler())]
+            if balancing is not None:
+                steps.append((balancing[1], to_instance(balancing)))
+                use_imblearn = True
+            else:
+                use_imblearn = False
+            steps.append((clf_info[1], clf))
+            pipe = _make_pipeline(steps, use_imblearn)
+
+    if permute:
+        pipe.fit(X_fit, y_fit[np.random.permutation(range(len(y_fit)))])
+    else:
+        pipe.fit(X_fit, y_fit)
     predicted = pipe.predict(X)
     return (y, predicted), pipe

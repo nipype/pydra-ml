@@ -32,7 +32,7 @@ def test_classifier(tmpdir):
         "nsamples": 15,
         "l1_reg": "aic",
         "plot_top_n_shap": 16,
-        "metrics": ["balanced_accuracy_score"],
+        "metrics": ["balanced_accuracy_score", "roc_auc_score"],
     }
     spec = gen_workflow(inputs, cache_dir=tmpdir)
     result = run_workflow(spec, "debug", {})
@@ -76,7 +76,7 @@ def test_classifier_imbalanced(tmpdir):
         "nsamples": 15,
         "l1_reg": "aic",
         "plot_top_n_shap": 16,
-        "metrics": ["balanced_accuracy_score"],
+        "metrics": ["balanced_accuracy_score", "roc_auc_score"],
     }
     spec = gen_workflow(inputs, cache_dir=tmpdir)
     result = run_workflow(spec, "debug", {})

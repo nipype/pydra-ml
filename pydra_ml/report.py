@@ -97,7 +97,7 @@ def plot_summary(summary, output_dir=None, filename="shap_plot", plot_top_n_shap
     plt.clf()
     plt.figure(figsize=(8, 12))
     # plot without all bootstrapping values
-    summary = summary[["mean", "std", "min", "max"]]
+    summary = summary[["median", "iqr", "q25", "q75"]]
     num_features = len(list(summary.index))
     if (plot_top_n_shap != 1 and type(plot_top_n_shap) is float) or type(
         plot_top_n_shap
@@ -141,14 +141,21 @@ def shaps_to_summary(
     ]
     if feature_names:
         shaps_n_splits.index = feature_names
-    # else:
-    # 	shaps_n_splits.index = [str(n) for n in shaps_n_splits.index]
-    # add summary stats
-    shaps_n_splits["mean"] = shaps_n_splits.mean(axis=1)
-    shaps_n_splits["std"] = shaps_n_splits.std(axis=1)
-    shaps_n_splits["min"] = shaps_n_splits.min(axis=1)
-    shaps_n_splits["max"] = shaps_n_splits.max(axis=1)
-    shaps_n_splits_sorted = shaps_n_splits.sort_values("mean")[::-1]
+    # Capture split columns before adding summary columns, so that each
+    # summary stat is computed only over per-split values (not over previously
+    # added summary columns, which would contaminate the results).
+    # abs() is applied because split values are mean(|shap|*perf) and perf
+    # (explained_variance_score) can be negative on poor splits, making the
+    # column negative; we want importance magnitude throughout.
+    split_cols = list(shaps_n_splits.columns)
+    abs_splits = shaps_n_splits[split_cols].abs()
+    shaps_n_splits["median"] = abs_splits.median(axis=1)
+    shaps_n_splits["iqr"] = abs_splits.quantile(0.75, axis=1) - abs_splits.quantile(
+        0.25, axis=1
+    )
+    shaps_n_splits["q25"] = abs_splits.quantile(0.25, axis=1)
+    shaps_n_splits["q75"] = abs_splits.quantile(0.75, axis=1)
+    shaps_n_splits_sorted = shaps_n_splits.sort_values("median")[::-1]
     shaps_n_splits_sorted.to_csv(f"{output_dir}summary_values_{filename}.csv")
 
     plot_summary(
@@ -362,6 +369,58 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
     save_obj(indexes_all, shap_dir + "indexes_quadrant.pkl")
 
 
+def _get_ylim(metric_name, scores):
+    """Return (ymin, ymax) appropriate for the given metric.
+
+    Strategy:
+    - Score metrics with known [0, 1] range: fix ymin=0, ymax=1.
+    - R²/explained-variance: fix ymax=1; clamp ymin to max(p01, -1).
+    - Non-negative error metrics (MAE, MSE, …): fix ymin=0; ymax=p99+margin.
+    - Unknown metrics: use [p01-margin, p99+margin].
+
+    Percentiles are computed over *all* rows (data + null) so that the null
+    distribution never gets clipped out of frame.
+    """
+    finite = scores[np.isfinite(scores)]
+    if len(finite) == 0:
+        return (None, None)
+    p01 = np.percentile(finite, 1)
+    p99 = np.percentile(finite, 99)
+    margin = max((p99 - p01) * 0.05, 1e-6)
+
+    bounded_01 = {
+        "roc_auc_score",
+        "accuracy_score",
+        "balanced_accuracy_score",
+        "f1_score",
+        "average_precision_score",
+        "recall_score",
+        "precision_score",
+        "jaccard_score",
+    }
+    r2_like = {"r2_score", "explained_variance_score"}
+    nonneg_error = {
+        "mean_absolute_error",
+        "mean_squared_error",
+        "root_mean_squared_error",
+        "mean_absolute_percentage_error",
+        "median_absolute_error",
+        "mean_squared_log_error",
+        "mean_poisson_deviance",
+        "mean_gamma_deviance",
+        "max_error",
+    }
+
+    if metric_name in bounded_01:
+        return (0.0, 1.0)
+    elif metric_name in r2_like:
+        return (max(p01 - margin, -1.0), 1.0)
+    elif metric_name in nonneg_error:
+        return (0.0, p99 + margin)
+    else:
+        return (p01 - margin, p99 + margin)
+
+
 def permutation_test_pvalue(mean_score, distribution):
     """
     the permutation-based empirical p-value from Test 1 in:
@@ -479,6 +538,9 @@ def gen_report(
         ax.set_xticks(ax.get_xticks())
         ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="center")
         ax.set_ylabel(name)
+        ymin, ymax = _get_ylim(name, subdf["score"].values)
+        if ymin is not None and ymax is not None:
+            ax.set_ylim(ymin, ymax)
         ax.legend(loc="center right", bbox_to_anchor=(1.2, 0.5), ncol=1)
         ax.tick_params(axis="both", which="both", length=0)
         sns.despine(left=True)

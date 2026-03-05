@@ -66,6 +66,7 @@ def TrainTestKernel(
     permute: ty.Any,
     balancing: ty.Any = None,
     balancing_bins: ty.Any = None,
+    groups: ty.Any = None,
 ) -> tuple[ty.Any, ty.Any]:
     return train_test_kernel(
         X,
@@ -76,6 +77,7 @@ def TrainTestKernel(
         permute,
         balancing,
         balancing_bins,
+        groups,
     )
 
 
@@ -136,8 +138,9 @@ def CreateModel(
     permute: ty.Any,
     balancing: ty.Any = None,
     balancing_bins: ty.Any = None,
+    groups: ty.Any = None,
 ) -> tuple[ty.Any, ty.Any]:
-    return create_model(X, y, clf_info, permute, balancing, balancing_bins)
+    return create_model(X, y, clf_info, permute, balancing, balancing_bins, groups)
 
 
 # --- Workflow definition ---
@@ -209,6 +212,7 @@ def MLWorkflow(
             permute=permute,
             balancing=balancing,
             balancing_bins=balancing_bins,
+            groups=readcsv.groups,
         ).split("split_index", split_index=gensplit.split_indices),
         name="fit_clf",
     )
@@ -259,6 +263,7 @@ def MLWorkflow(
             permute=permute,
             balancing=balancing,
             balancing_bins=balancing_bins,
+            groups=readcsv.groups,
         ),
         name="create_model",
     )

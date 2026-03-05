@@ -22,6 +22,67 @@ except ImportError:
     pass
 
 
+def to_instance(clf_info):
+    """Recursively instantiate a classifier/regressor from a spec list.
+
+    :param clf_info: [module, class] or [module, class, {params}] or
+        [module, class, {params}, grid] where params may contain nested
+        clf_info specs under 'estimators' (list of [name, clf_info] pairs)
+        and 'final_estimator' (a clf_info list) for meta-estimators like
+        StackingRegressor / StackingClassifier.
+    :return: instantiated sklearn-compatible estimator
+    """
+    mod = __import__(clf_info[0], fromlist=[clf_info[1]])
+    params = {}
+    if len(clf_info) > 2:
+        params = dict(clf_info[2])
+        if "estimators" in params:
+            params["estimators"] = [
+                (
+                    (name, to_instance(est_info))
+                    if isinstance(est_info, list)
+                    else (name, est_info)
+                )
+                for name, est_info in params["estimators"]
+            ]
+        if "final_estimator" in params and isinstance(params["final_estimator"], list):
+            params["final_estimator"] = to_instance(params["final_estimator"])
+    clf = getattr(mod, clf_info[1])(**params)
+    if len(clf_info) == 4:
+        from sklearn.model_selection import GridSearchCV
+
+        clf = GridSearchCV(clf, param_grid=clf_info[3])
+    return clf
+
+
+def _configure_group_cv(pipe, X_fit, y_fit, groups_fit):
+    """Precompute group-aware CV splits and bake them into nested estimators.
+
+    For each pipeline step that is a StackingRegressor, StackingClassifier,
+    or GridSearchCV, replaces its ``cv`` with a precomputed list of
+    (train, test) index tuples produced by ``GroupKFold``.  Baking the splits
+    in avoids any need for sklearn metadata routing — the estimator uses the
+    exact index lists and never needs ``groups`` passed at fit time.
+
+    :param pipe: constructed sklearn / imblearn Pipeline
+    :param X_fit: training feature matrix (used only for split generation)
+    :param y_fit: training target array (used only for split generation)
+    :param groups_fit: group labels for the training data (1-D array-like)
+    :return: empty dict (no extra fit_params needed)
+    """
+    from sklearn.model_selection import GroupKFold
+
+    _NESTED_CV = {"StackingRegressor", "StackingClassifier", "GridSearchCV"}
+
+    for _step_name, step_est in pipe.steps:
+        if type(step_est).__name__ in _NESTED_CV:
+            n = step_est.cv if isinstance(step_est.cv, int) else 5
+            gkf = GroupKFold(n_splits=n)
+            step_est.cv = list(gkf.split(X_fit, y_fit, groups=groups_fit))
+
+    return {}
+
+
 def read_file(filename, x_indices=None, target_vars=None, group=None):
     """Read a CSV data file
 
@@ -148,6 +209,7 @@ def train_test_kernel(
     permute,
     balancing=None,
     balancing_bins=None,
+    groups=None,
 ):
     """Core model fitting and predicting function
 
@@ -162,22 +224,14 @@ def train_test_kernel(
         resampler is applied pre-fit on binned y (not inside the pipeline) and
         continuous y values are recovered via 1-NN.  When None and balancing is
         set, the resampler is inserted into an imblearn Pipeline (classification).
+    :param groups: optional group labels (1-D array-like, same length as X).
+        When provided, nested estimators (StackingRegressor, GridSearchCV, …)
+        inside the pipeline are automatically reconfigured to use GroupKFold and
+        the training-subset groups are forwarded via pipe.fit() fit_params.
     :return: outputs, trained classifier with sample indices
     """
     import numpy as np
     from sklearn.pipeline import Pipeline
-
-    def to_instance(clf_info):
-        mod = __import__(clf_info[0], fromlist=[clf_info[1]])
-        params = {}
-        if len(clf_info) > 2:
-            params = clf_info[2]
-        clf = getattr(mod, clf_info[1])(**params)
-        if len(clf_info) == 4:
-            from sklearn.model_selection import GridSearchCV
-
-            clf = GridSearchCV(clf, param_grid=clf_info[3])
-        return clf
 
     def _is_imblearn(info):
         return info[0].startswith("imblearn")
@@ -233,8 +287,27 @@ def train_test_kernel(
             steps.append((clf_info[1], clf))
             pipe = _make_pipeline(steps, use_imblearn)
 
+    if groups is not None:
+        groups_fit = np.asarray(groups)[train_index]
+        _configure_group_cv(pipe, X_fit, y_fit, groups_fit)
+
     if permute:
-        pipe.fit(X_fit, y_fit[np.random.permutation(range(len(y_fit)))])
+        if groups is not None:
+            # Block permutation: shuffle group→y mapping across participants
+            # (keep within-participant y values together, reassign them to a
+            # different participant's features).
+            unique_grps = np.unique(groups_fit)
+            shuffled_grps = unique_grps[np.random.permutation(len(unique_grps))]
+            y_permuted = y_fit.copy()
+            for orig_grp, src_grp in zip(unique_grps, shuffled_grps):
+                orig_idx = np.where(groups_fit == orig_grp)[0]
+                src_idx = np.where(groups_fit == src_grp)[0]
+                src_y = y_fit[src_idx]
+                for k, i in enumerate(orig_idx):
+                    y_permuted[i] = src_y[k % len(src_y)]
+            pipe.fit(X_fit, y_permuted)
+        else:
+            pipe.fit(X_fit, y_fit[np.random.permutation(range(len(y_fit)))])
     else:
         pipe.fit(X_fit, y_fit)
     predicted = pipe.predict(X[test_index])
@@ -388,7 +461,9 @@ def get_shap(X, permute, model, gen_shap=False, nsamples="auto", l1_reg="aic"):
     return shaps
 
 
-def create_model(X, y, clf_info, permute, balancing=None, balancing_bins=None):
+def create_model(
+    X, y, clf_info, permute, balancing=None, balancing_bins=None, groups=None
+):
     """Train a model with all the data
 
     :param X: Input features
@@ -398,22 +473,13 @@ def create_model(X, y, clf_info, permute, balancing=None, balancing_bins=None):
     :param balancing: optional imblearn resampler spec [module, class, {params}]
     :param balancing_bins: if set, enables regression-aware resampling (see
         train_test_kernel for details)
+    :param groups: optional group labels (1-D array-like). When provided,
+        nested estimators are reconfigured to use GroupKFold and groups are
+        forwarded via pipe.fit() fit_params.
     :return: training error, classifier
     """
     import numpy as np
     from sklearn.pipeline import Pipeline
-
-    def to_instance(clf_info):
-        mod = __import__(clf_info[0], fromlist=[clf_info[1]])
-        params = {}
-        if len(clf_info) > 2:
-            params = clf_info[2]
-        clf = getattr(mod, clf_info[1])(**params)
-        if len(clf_info) == 4:
-            from sklearn.model_selection import GridSearchCV
-
-            clf = GridSearchCV(clf, param_grid=clf_info[3])
-        return clf
 
     def _is_imblearn(info):
         return info[0].startswith("imblearn")
@@ -461,8 +527,29 @@ def create_model(X, y, clf_info, permute, balancing=None, balancing_bins=None):
             steps.append((clf_info[1], clf))
             pipe = _make_pipeline(steps, use_imblearn)
 
+    if groups is not None:
+        import numpy as _np
+
+        groups_arr = _np.asarray(groups)
+        _configure_group_cv(pipe, X_fit, y_fit, groups_arr)
+
     if permute:
-        pipe.fit(X_fit, y_fit[np.random.permutation(range(len(y_fit)))])
+        if groups is not None:
+            # Block permutation: shuffle group→y mapping across participants
+            # (keep within-participant y values together, reassign them to a
+            # different participant's features).
+            unique_grps = _np.unique(groups_arr)
+            shuffled_grps = unique_grps[_np.random.permutation(len(unique_grps))]
+            y_permuted = y_fit.copy()
+            for orig_grp, src_grp in zip(unique_grps, shuffled_grps):
+                orig_idx = _np.where(groups_arr == orig_grp)[0]
+                src_idx = _np.where(groups_arr == src_grp)[0]
+                src_y = y_fit[src_idx]
+                for k, i in enumerate(orig_idx):
+                    y_permuted[i] = src_y[k % len(src_y)]
+            pipe.fit(X_fit, y_permuted)
+        else:
+            pipe.fit(X_fit, y_fit[np.random.permutation(range(len(y_fit)))])
     else:
         pipe.fit(X_fit, y_fit)
     predicted = pipe.predict(X)

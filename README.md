@@ -35,16 +35,22 @@ number of iterations (`n_splits`) is increased. Just change spec file and it wil
 
     Each bootstrapping split of the data may create its own model (e.g., different weights or best hyperparameters). For each split, we take the average of the absolute SHAP values across all test predictions. We then compute the average SHAP values across all splits.
 
-
-
+5. **Handle imbalanced datasets** via [imbalanced-learn](https://imbalanced-learn.org) for both
+   classification (class imbalance) and regression (skewed target distribution).
 
 
 ### Installation
 
-pydraml requires Python 3.7+.
+pydraml requires Python 3.11+.
 
 ```
 pip install pydra-ml
+```
+
+To enable imbalanced-learn support (optional):
+
+```
+pip install pydra-ml[imbalanced]
 ```
 
 ## CLI usage
@@ -115,6 +121,15 @@ will want to generate `x_indices` programmatically.
 - *test_size*: Fraction of data to use for test set in each iteration
 - *clf_info*: List of scikit-learn classifiers to use.
 - *permute*: List of booleans to indicate whether to generate a null model with permuted labels aka permutation test (set to true) or not (set to false)
+- *bootstrap_strategy*: How to split data into train/test sets on each bootstrap iteration. One of:
+  - `"group_shuffle"` *(default)* — `GroupShuffleSplit`; respects the `group_var` column.
+  - `"stratified"` — `StratifiedShuffleSplit`; ensures each split contains the same class proportions. Recommended for classification with class imbalance.
+  - `"stratified_regression"` — bins the continuous target into `n_bins` equal-frequency quantile bins, then applies `StratifiedShuffleSplit` on those bins. Ensures each split covers the full range of target values. Recommended for regression with skewed target distributions.
+- *n_bins*: Number of quantile bins used by `"stratified_regression"` (default `10`). Ignored for other strategies.
+- *balancing*: *(optional)* An [imbalanced-learn](https://imbalanced-learn.org) resampler specification in the same `[module, class, {params}]` format as `clf_info`. Requires the `imbalanced` extra (`pip install pydra-ml[imbalanced]`).
+  - For **classification** (`balancing_bins` is `null`/absent): the resampler is inserted as a pipeline step before the final estimator and is applied during `fit()` only. Test data is never resampled.
+  - For **regression** (`balancing_bins` is set): the resampler is applied to the training data *before* pipeline fitting, using a discretised (binned) copy of the target as class labels. Continuous target values are recovered afterwards via 1-NN lookup on the original training data.
+- *balancing_bins*: *(optional, regression only)* Integer number of quantile bins used to discretise the continuous target when applying the resampler. Setting this enables regression-aware resampling. Must be set together with `balancing`.
 - *gen_feature_importance*: Boolean indicating whether unique feature importance method should be generated for each model if available (e.g., `coef_` for linear models, `feature_importances_` for tree-based models) *NOT FULLY TESTED: set to false*
 - *gen_permutation_importance*: Boolean indicating whether permutation_importance values are generated (model agnostic, available for all models) *NOT FULLY TESTED: set to false*
 - *gen_shap*: Boolean indicating whether shap values are generated (model agnostic, available for all models)
@@ -148,6 +163,19 @@ example:
    ["sklearn.tree", "DecisionTreeClassifier", {"max_depth": 5}]
   ]
 ```
+
+imblearn pipeline steps can be included inline in the same format:
+
+```
+ [ ["sklearn.preprocessing", "StandardScaler"],
+   ["imblearn.over_sampling", "SMOTE", {"random_state": 0}],
+   ["sklearn.linear_model", "LogisticRegression"]
+  ]
+```
+
+When any step's module starts with `"imblearn"`, the pipeline is automatically
+built as an `imblearn.pipeline.Pipeline` so that samplers are only applied
+during `fit()`, never during `predict()`.
 
 ## Example specification:
 
@@ -195,12 +223,87 @@ example:
  }
 ```
 
+## Imbalanced dataset examples
+
+### Classification with SMOTE oversampling
+
+Requires `pip install pydra-ml[imbalanced]`.
+
+```json
+{
+  "filename": "breast_cancer.csv",
+  "x_indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  "target_vars": ["target"],
+  "group_var": null,
+  "n_splits": 50,
+  "test_size": 0.2,
+  "clf_info": [
+    ["sklearn.neural_network", "MLPClassifier", {"alpha": 1, "max_iter": 1000}],
+    ["sklearn.linear_model", "LogisticRegression"]
+  ],
+  "permute": [true, false],
+  "balancing": ["imblearn.over_sampling", "SMOTE", {"random_state": 0}],
+  "bootstrap_strategy": "stratified",
+  "gen_feature_importance": false,
+  "gen_permutation_importance": false,
+  "permutation_importance_n_repeats": 5,
+  "permutation_importance_scoring": "accuracy",
+  "gen_shap": false,
+  "nsamples": "auto",
+  "l1_reg": "aic",
+  "plot_top_n_shap": 16,
+  "metrics": ["roc_auc_score", "accuracy_score"]
+}
+```
+
+`bootstrap_strategy: "stratified"` ensures each train/test split preserves the
+original class proportions before SMOTE is applied to the training fold.
+
+### Regression with target-distribution resampling
+
+```json
+{
+  "filename": "diabetes_table.csv",
+  "x_indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  "target_vars": ["target"],
+  "group_var": null,
+  "n_splits": 50,
+  "test_size": 0.2,
+  "clf_info": [
+    ["sklearn.linear_model", "LinearRegression", {"fit_intercept": true}]
+  ],
+  "permute": [true, false],
+  "balancing": ["imblearn.under_sampling", "RandomUnderSampler", {"random_state": 0}],
+  "balancing_bins": 5,
+  "bootstrap_strategy": "stratified_regression",
+  "n_bins": 5,
+  "gen_feature_importance": false,
+  "gen_permutation_importance": false,
+  "permutation_importance_n_repeats": 5,
+  "permutation_importance_scoring": "r2",
+  "gen_shap": false,
+  "nsamples": "auto",
+  "l1_reg": "aic",
+  "plot_top_n_shap": 10,
+  "metrics": ["explained_variance_score"]
+}
+```
+
+`bootstrap_strategy: "stratified_regression"` with `n_bins: 5` bins the continuous
+target into 5 equal-frequency quantile ranges and uses `StratifiedShuffleSplit` on
+those bins, so every split sees the full target range. `balancing_bins: 5` also
+discretises the training target (same bin count) for the resampler; continuous
+target values are recovered via 1-NN lookup after resampling so no information is
+lost during prediction.
+
 ## Output:
 The workflow will output:
-<<<<<<< HEAD
-- `results-{timestamp}.pkl` containing 1 list per model used. For example, if the `pkl` file is
-assigned to variable `results`, the models are accessed through `results[0]` to `results[N]`.
- If `permute: [false,true]` then it will output the model trained on the labels first (`results[0]`) and the model trained on the permuted labels second (`results[1]`). If there is an additional model, these will be accessed through `results[2]` (labels) and `results[3]` (permuted).
+- `results-{timestamp}.pkl` containing 1 list per model used. For example, if the
+  `pkl` file is assigned to variable `results`, the models are accessed through
+  `results[0]` to `results[N]`. If `permute: [true, false]` then it will output
+  the model trained on permuted labels first (`results[0]`) and the model trained
+  on true labels second (`results[1]`). If there is an additional model, these
+  will be accessed through `results[2]` (permuted) and `results[3]` (labels).
 
   Each model contains:
     - `dict` accessed through `results[0][0]` with model information:
@@ -210,29 +313,18 @@ assigned to variable `results`, the models are accessed through `results[0]` to 
         with open("results-20201208T010313.229190.pkl", "rb") as fp:
             results = pk.load(fp)
 
-        print(results[0][0]) #1st model trained on labels
+        print(results[0][0]) #1st model trained on permuted labels
+        ```
+
+        `{'ml_wf.clf_info': ['sklearn.neural_network', 'MLPClassifier', {'alpha': 1, 'max_iter': 1000}], 'ml_wf.permute': True}`
+
+        ```python
+        print(results[1][0]) #1st model trained on labels
         ```
 
         `{'ml_wf.clf_info': ['sklearn.neural_network', 'MLPClassifier', {'alpha': 1, 'max_iter': 1000}], 'ml_wf.permute': False}`
 
-        ```python
-        print(results[3][0]) #2nd models trained on permuted labels
-        ```
-
-        `{'ml_wf.clf_info':['sklearn.linear_model', 'LogisticRegression', {'penalty': 'l2'}], 'ml_wf.permute': True}`
-
-    - `pydra Result obj` accessed through `results[0][1].output`:
-=======
-- `results-{timestamp}.pkl` containing 1 list per model used. For example, if
-assigned to variable `results`, it is accessed through `results[0]` to `results[N]`
-(e.g., if `permute: [true,false]` then it will output the model trained on permuted labels first `results[0]` and the model trained on the labels
-second `results[1]`. If there is an additional model, these will be accessed through `results[2]` and `results[3]`).
-Each model contains:
-    - `dict` accessed through `results[0][0]` with model information:
-     `{'ml_wf.clf_info': ['sklearn.neural_network', 'MLPClassifier',
-         {'alpha': 1, 'max_iter': 1000}], 'ml_wf.permute': False}`
     - `pydra Result obj` accessed through `results[0][1]` with attribute `output`
->>>>>>> ea2092bb5f199aa6ff83f25f863d3652f824f6af
       which itself has attributes:
         - `feature_names`: from the columns of the data csv.
 
@@ -283,7 +375,7 @@ Each model contains:
           with open("results-20201208T010313.229190.pkl", "rb") as fp:
               results = pk.load(fp)
 
-          trained_model = results[0][1].output.model
+          trained_model = results[1][1].output.model
           trained_model.predict(np.random.rand(1, 30))
           ```
 

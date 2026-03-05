@@ -42,8 +42,18 @@ def GenSplits(
     X: ty.Any,
     Y: ty.Any,
     groups: ty.Any = None,
+    bootstrap_strategy: str = "group_shuffle",
+    n_bins: int = 10,
 ) -> tuple[ty.Any, ty.Any]:
-    return gen_splits(n_splits, test_size, X, Y, groups)
+    return gen_splits(
+        n_splits,
+        test_size,
+        X,
+        Y,
+        groups,
+        bootstrap_strategy=bootstrap_strategy,
+        n_bins=n_bins,
+    )
 
 
 @python.define(outputs={"output": ty.Any, "model": ty.Any})
@@ -54,8 +64,21 @@ def TrainTestKernel(
     split_index: ty.Any,
     clf_info: ty.Any,
     permute: ty.Any,
+    balancing: ty.Any = None,
+    balancing_bins: ty.Any = None,
+    groups: ty.Any = None,
 ) -> tuple[ty.Any, ty.Any]:
-    return train_test_kernel(X, y, train_test_split, split_index, clf_info, permute)
+    return train_test_kernel(
+        X,
+        y,
+        train_test_split,
+        split_index,
+        clf_info,
+        permute,
+        balancing,
+        balancing_bins,
+        groups,
+    )
 
 
 @python.define(outputs={"score": ty.Any, "output": ty.Any})
@@ -109,9 +132,15 @@ def GetShap(
 
 @python.define(outputs={"output": ty.Any, "model": ty.Any})
 def CreateModel(
-    X: ty.Any, y: ty.Any, clf_info: ty.Any, permute: ty.Any
+    X: ty.Any,
+    y: ty.Any,
+    clf_info: ty.Any,
+    permute: ty.Any,
+    balancing: ty.Any = None,
+    balancing_bins: ty.Any = None,
+    groups: ty.Any = None,
 ) -> tuple[ty.Any, ty.Any]:
-    return create_model(X, y, clf_info, permute)
+    return create_model(X, y, clf_info, permute, balancing, balancing_bins, groups)
 
 
 # --- Workflow definition ---
@@ -146,6 +175,10 @@ def MLWorkflow(
     nsamples: ty.Any,
     l1_reg: ty.Any,
     plot_top_n_shap: ty.Any,
+    balancing: ty.Any = None,
+    bootstrap_strategy: str = "group_shuffle",
+    n_bins: int = 10,
+    balancing_bins: ty.Any = None,
 ) -> tuple[ty.Any, ty.Any, ty.Any, ty.Any, ty.Any, ty.Any, ty.Any]:
     readcsv = workflow.add(
         ReadFile(
@@ -163,6 +196,8 @@ def MLWorkflow(
             X=readcsv.X,
             Y=readcsv.Y,
             groups=readcsv.groups,
+            bootstrap_strategy=bootstrap_strategy,
+            n_bins=n_bins,
         ),
         name="gensplit",
     )
@@ -175,6 +210,9 @@ def MLWorkflow(
             split_index=gensplit.split_indices,
             clf_info=clf_info,
             permute=permute,
+            balancing=balancing,
+            balancing_bins=balancing_bins,
+            groups=readcsv.groups,
         ).split("split_index", split_index=gensplit.split_indices),
         name="fit_clf",
     )
@@ -223,6 +261,9 @@ def MLWorkflow(
             y=readcsv.Y,
             clf_info=clf_info,
             permute=permute,
+            balancing=balancing,
+            balancing_bins=balancing_bins,
+            groups=readcsv.groups,
         ),
         name="create_model",
     )
@@ -272,6 +313,10 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
         nsamples=inputs["nsamples"],
         l1_reg=inputs["l1_reg"],
         plot_top_n_shap=inputs["plot_top_n_shap"],
+        balancing=inputs.get("balancing", None),
+        bootstrap_strategy=inputs.get("bootstrap_strategy", "group_shuffle"),
+        n_bins=inputs.get("n_bins", 10),
+        balancing_bins=inputs.get("balancing_bins", None),
     ).split(["clf_info", "permute"], clf_info=clf_infos, permute=permutes)
     return WorkflowSpec(wf=wf, cache_dir=cache_dir, inputs=inputs)
 

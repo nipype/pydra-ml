@@ -80,6 +80,29 @@ pydraml -s specification.json -p dask "address=tcp://host:8786"
 
 Classifiers are dynamically instantiated via `__import__()`. A nested list means a scikit-learn `Pipeline`.
 
+### Imbalanced-learn support (branch: enh/imbalanced-learn)
+
+New optional spec keys — all default to `null`/`"group_shuffle"`/`10` so existing specs are unaffected:
+
+| Key | Type | Default | Purpose |
+|-----|------|---------|---------|
+| `balancing` | list | `null` | imblearn resampler spec `[module, class, {params}]` |
+| `balancing_bins` | int | `null` | When set → regression-aware resampling (bin y, resample, recover continuous y via 1-NN) |
+| `bootstrap_strategy` | str | `"group_shuffle"` | `"stratified"` for classification, `"stratified_regression"` for regression |
+| `n_bins` | int | `10` | Quantile bins used by `"stratified_regression"` splitting |
+
+**Classification resampling** (`balancing` set, `balancing_bins` absent): sampler inserted as pipeline step inside `imblearn.pipeline.Pipeline`; never applied to test data.
+
+**Regression resampling** (`balancing` + `balancing_bins` both set): `_resample_for_regression()` in `tasks.py` bins y, applies sampler, recovers continuous y via k=1 NN lookup; pipeline has no sampler step.
+
+**`pipeline.steps[-1][1]`** — `get_feature_importance` and `get_permutation_importance` use `-1` (last step) not `1`, so they work correctly when a balancing step is present.
+
+**Null distribution note**: use `balanced_accuracy_score` (not `roc_auc_score`) as the primary classification metric for permutation tests. `roc_auc_score` with `predict_proba` gives AUC ≈ 1−real_AUC for the null on informative datasets (inverted classifier effect); `balanced_accuracy_score` reliably centres at 0.5. Both metrics are included in the test suite.
+
+**Install imbalanced-learn**: `uv pip install imbalanced-learn` or `uv pip install -e ".[imbalanced]"`.
+
+**New tests**: `test_classifier_imbalanced`, `test_regressor_imbalanced` (both skip gracefully if imbalanced-learn absent).
+
 ### Code style
 
 - Formatting: **black** (line length from flake8 config: max 99 chars)

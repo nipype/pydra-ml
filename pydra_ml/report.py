@@ -323,10 +323,8 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
             #  take the absolute mean weighted by performance across all predictions
             for quadrant in ["lp", "lm", "um", "up"]:
                 if len(indexes.get(quadrant)) == 0:
-                    warnings.warn(
-                        f"""There were no {quadrant.upper()}s, this will
-                        output NaNs in the csv and figure for this split column"""
-                    )
+                    warnings.warn(f"""There were no {quadrant.upper()}s, this will
+                        output NaNs in the csv and figure for this split column""")
                 shaps_i_quadrant = np.array(shaps_i)[
                     indexes.get(quadrant)
                 ]  # shape (P, F) P prediction x F feature_names

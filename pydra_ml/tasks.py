@@ -87,6 +87,45 @@ def _target_sample_weights(y, n_bins=10):
     return weights * (len(weights) / weights.sum())
 
 
+def build_pipeline(clf_info):
+    """Build an imblearn Pipeline from a clf_info spec.
+
+    A nested-list clf_info is built step by step (e.g. a sampler followed by
+    a scaler followed by a classifier). A single clf_info is wrapped in a
+    default StandardScaler + classifier pipeline. A 4-element clf_info wraps
+    the classifier in GridSearchCV over the given param grid.
+
+    :param clf_info: how to construct the classifier (see the clf_info spec
+        format in the README)
+    :return: an unfitted imblearn.pipeline.Pipeline
+    """
+
+    def to_instance(clf_info):
+        mod = __import__(clf_info[0], fromlist=[clf_info[1]])
+        params = {}
+        if len(clf_info) > 2:
+            params = clf_info[2]
+        clf = getattr(mod, clf_info[1])(**params)
+        if len(clf_info) == 4:
+            from sklearn.model_selection import GridSearchCV
+
+            clf = GridSearchCV(clf, param_grid=clf_info[3])
+        return clf
+
+    if isinstance(clf_info[0], list):
+        # Process as a pipeline constructor
+        steps = []
+        for val in clf_info:
+            step = to_instance(val)
+            steps.append((val[1], step))
+        return Pipeline(steps)
+    else:
+        clf = to_instance(clf_info)
+        from sklearn.preprocessing import StandardScaler
+
+        return Pipeline([("std", StandardScaler()), (clf_info[1], clf)])
+
+
 def _fit_with_optional_target_weights(pipe, X, y, balance_target, target_n_bins):
     """Fit pipe, optionally weighting samples by inverse target frequency.
 
@@ -135,32 +174,8 @@ def train_test_kernel(
     :return: outputs, trained classifier with sample indices
     """
     import numpy as np
-    from imblearn.pipeline import Pipeline
 
-    def to_instance(clf_info):
-        mod = __import__(clf_info[0], fromlist=[clf_info[1]])
-        params = {}
-        if len(clf_info) > 2:
-            params = clf_info[2]
-        clf = getattr(mod, clf_info[1])(**params)
-        if len(clf_info) == 4:
-            from sklearn.model_selection import GridSearchCV
-
-            clf = GridSearchCV(clf, param_grid=clf_info[3])
-        return clf
-
-    if isinstance(clf_info[0], list):
-        # Process as a pipeline constructor
-        steps = []
-        for val in clf_info:
-            step = to_instance(val)
-            steps.append((val[1], step))
-        pipe = Pipeline(steps)
-    else:
-        clf = to_instance(clf_info)
-        from sklearn.preprocessing import StandardScaler
-
-        pipe = Pipeline([("std", StandardScaler()), (clf_info[1], clf)])
+    pipe = build_pipeline(clf_info)
 
     train_index, test_index = train_test_split[split_index]
     y = y.ravel()
@@ -339,32 +354,8 @@ def create_model(X, y, clf_info, permute, balance_target=False, target_n_bins=10
     :return: training error, classifier
     """
     import numpy as np
-    from imblearn.pipeline import Pipeline
 
-    def to_instance(clf_info):
-        mod = __import__(clf_info[0], fromlist=[clf_info[1]])
-        params = {}
-        if len(clf_info) > 2:
-            params = clf_info[2]
-        clf = getattr(mod, clf_info[1])(**params)
-        if len(clf_info) == 4:
-            from sklearn.model_selection import GridSearchCV
-
-            clf = GridSearchCV(clf, param_grid=clf_info[3])
-        return clf
-
-    if isinstance(clf_info[0], list):
-        # Process as a pipeline constructor
-        steps = []
-        for val in clf_info:
-            step = to_instance(val)
-            steps.append((val[1], step))
-        pipe = Pipeline(steps)
-    else:
-        clf = to_instance(clf_info)
-        from sklearn.preprocessing import StandardScaler
-
-        pipe = Pipeline([("std", StandardScaler()), (clf_info[1], clf)])
+    pipe = build_pipeline(clf_info)
 
     y = y.ravel()
     if permute:

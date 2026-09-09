@@ -13,11 +13,14 @@ uv pip install --pre -e ".[dev]"
 ### Run tests
 ```bash
 uv run pytest pydra_ml/tests/test_classifier.py -s
+uv run pytest pydra_ml/tests/test_sharp.py -s
 # Single test
 uv run pytest pydra_ml/tests/test_classifier.py::test_classifier -s
 uv run pytest pydra_ml/tests/test_classifier.py::test_regressor -s
 ```
 The `-s` flag is required because pytest's default stdout capture can interfere with matplotlib/seaborn output.
+`test_sharp.py` runs Monte Carlo calibration checks and is slower (tens of seconds) than
+`test_classifier.py`.
 
 ### Linting and formatting
 ```bash
@@ -36,13 +39,20 @@ pydraml -s specification.json -p dask "address=tcp://host:8786"
 
 ### Module responsibilities
 
-- **`tasks.py`** — Pure Python functions wrapped as Pydra tasks: `read_file`, `gen_splits`, `train_test_kernel`, `calc_metric`, `get_feature_importance`, `get_permutation_importance`, `get_shap`, `create_model`.
+- **`tasks.py`** — Pure Python functions wrapped as Pydra tasks: `read_file`, `gen_splits`, `train_test_kernel`, `calc_metric`, `get_feature_importance`, `get_permutation_importance`, `get_shap`, `create_model`. `build_pipeline` builds the `imblearn.pipeline.Pipeline` from a `clf_info` spec and is shared by `train_test_kernel`/`create_model` (and reused by `sharp_test.py`).
 
 - **`classifier.py`** — Builds and runs the Pydra workflow DAG (`gen_workflow`, `run_workflow`). The workflow splits on `clf_info` (one per classifier) and `permute` (true/false for null models), runs tasks in parallel, then combines results.
 
 - **`report.py`** — Post-processing: generates violin plots, pairwise statistical comparison heatmaps (empirical p-values), performance tables (median + 95% CI), and SHAP summary plots/CSVs. Classification uses TP/TN/FP/FN quadrant analysis; regression uses quartile analysis.
 
 - **`cli.py`** — Click-based CLI. Parses the JSON spec file, validates it, then calls `gen_workflow` / `run_workflow`.
+
+- **`sharp_test.py`** — Standalone SHARP (Split-HAlf RePeated) significance test for
+  comparing two models' cross-validated performance without the fold-dependence problem
+  that makes naive tests (like `report.py`'s pairwise empirical p-value) invalid. Not
+  wired into the pydra workflow; called directly (`sharp_compare` or
+  `split_half_repeated_cv` + `sharp_test`). See its module docstring for the important
+  calibration caveat.
 
 ### Data flow
 

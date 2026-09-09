@@ -348,6 +348,48 @@ without null distribution trained on permuted labels)
         summary statistics for all features (set to 1.0) or only the top N most
         important features for better visualization.
 
+## Significance testing
+
+The `stats-{metric}` pairwise comparison described above uses an empirical
+p-value across bootstrapping splits (Ojala & Garriga, 2010), which — like most
+significance tests reported in the ML literature — does not account for the
+correlation between splits/folds that share underlying data. Zeng, Li,
+Zhang et al., Yeo, B.T.T. (2026), ["Widespread use of invalid statistical
+tests in biomedical machine learning"](https://doi.org/10.64898/2026.05.17.724301),
+found this ignored-fold-dependence problem in 97% of a sample of 210
+high-impact studies, and shows it inflates false positive rates. The same
+paper proposes the SHARP (Split-HAlf RePeated) test to address this, which
+`pydra_ml.sharp_test` implements:
+
+```python
+from pydra_ml.sharp_test import sharp_compare
+
+result = sharp_compare(
+    X, y,
+    clf_info_1=("sklearn.ensemble", "RandomForestClassifier", {"n_estimators": 100}),
+    clf_info_2=("sklearn.linear_model", "LogisticRegression"),
+    metric="roc_auc_score",
+    n_repeats=30,
+    n_folds=5,
+)
+print(result.mean_diff, result.p_value, result.ci)
+```
+
+`sharp_compare` runs the split-half repeated cross-validation procedure
+(`split_half_repeated_cv`) and the test itself (`sharp_test`) in one call; call
+them separately if you already have precomputed per-repetition performance
+differences from split halves A and B.
+
+**Caveat**: this is our own derivation from the equations and covariance
+structure given in the paper's Methods Section 4.6, not a port of the
+paper's own code — the exact estimating equations are in a Supplementary
+Methods section we could not access (see `pydra_ml/sharp_test.py` for
+details). Simulation-based validation
+(`pydra_ml/tests/test_sharp.py`) shows it controls the false positive rate
+near the nominal level when the fitted between-repetition correlation is
+moderate to large, and is conservative (never anti-conservative) when that
+correlation is small.
+
 ## Debugging
 
 You will need to understand a bit of pydra to know how to debug this application for

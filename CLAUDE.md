@@ -74,7 +74,9 @@ pydraml -s specification.json -p dask "address=tcp://host:8786"
   "metrics": ["roc_auc_score", "accuracy_score"],
   "gen_shap": true,
   "gen_feature_importance": false,
-  "gen_permutation_importance": false
+  "gen_permutation_importance": false,
+  "balance_target": false,
+  "target_n_bins": 10
 }
 ```
 
@@ -82,6 +84,12 @@ Classifiers are dynamically instantiated via `__import__()`. A nested list is bu
 `imblearn.pipeline.Pipeline` (a superset of `sklearn.pipeline.Pipeline`), so steps can mix
 regular transformers with imbalanced-learn samplers (e.g. `imblearn.over_sampling.SMOTE`),
 which only implement `fit_resample`, not `transform`.
+
+`balance_target`/`target_n_bins` (both optional, default `false`/`10`) fit with sample
+weights inversely proportional to target frequency — a classification target is weighted
+by exact inverse class frequency, a continuous regression target is binned into
+`target_n_bins` bins first (see `tasks._target_sample_weights`). This is the
+imbalanced-learn-independent, regression-friendly alternative to resampling.
 
 ### Code style
 

@@ -124,6 +124,16 @@ will want to generate `x_indices` programmatically.
 or 0.1 for top 10%). Set to 1.0 (float) to plot all features or 1 (int) to plot
 top first feature.
 - *metrics*: scikit-learn metric to use
+- *balance_target* (optional, default `false`): Boolean indicating whether to fit with
+  sample weights inversely proportional to target frequency, to counter a skewed or
+  imbalanced target. Works for both classification and regression targets (a
+  continuous regression target is binned first — see `target_n_bins`). Silently falls
+  back to an unweighted fit (with a warning) for classifiers/regressors whose `fit()`
+  doesn't accept `sample_weight`.
+- *target_n_bins* (optional, default `10`): Number of bins to discretize a continuous
+  target into when computing `balance_target` weights. Ignored if the target already
+  has fewer unique values than this (e.g. a classification target), in which case
+  weights are the exact inverse class frequency instead.
 
 ## `clf_info` specification
 
@@ -164,7 +174,10 @@ for example with SMOTE:
 
 Alternatively, most scikit-learn classifiers accept a `class_weight` parameter
 (e.g., `{"class_weight": "balanced"}`) as a resampling-free way to handle
-imbalanced classes.
+imbalanced classes. `imbalanced-learn`'s samplers are classification-only (they
+reject a continuous target); for a skewed regression target (e.g., rare extreme
+values), use the top-level `balance_target` option instead, which weights samples
+by inverse target-density rather than resampling.
 
 ## Example specification:
 

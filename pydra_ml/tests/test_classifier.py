@@ -1,8 +1,10 @@
 import os
 
 import numpy as np
+import pytest
 
 from ..classifier import gen_workflow, run_workflow
+from ..tasks import _fit_with_optional_target_weights, _target_sample_weights
 
 
 def test_classifier(tmpdir):
@@ -85,6 +87,80 @@ def test_classifier_with_resampling(tmpdir):
     # StandardScaler, now that the pipeline has a sampler step in front.
     feature_importance = result.outputs.feature_importance[0][0]
     assert len(feature_importance) == 10
+
+
+def test_target_sample_weights():
+    # Discrete target: exact inverse class-frequency weighting.
+    y_discrete = np.array([0] * 8 + [1] * 2)
+    weights = _target_sample_weights(y_discrete, n_bins=10)
+    assert np.isclose(weights.mean(), 1.0)
+    assert np.isclose(weights[y_discrete == 1][0] / weights[y_discrete == 0][0], 4.0)
+
+    # Continuous target: a handful of extreme values are rarer than the
+    # densely-populated middle, so they should end up upweighted.
+    rng = np.random.RandomState(0)
+    y_continuous = np.concatenate([rng.normal(0, 1, 95), [50.0] * 5])
+    weights = _target_sample_weights(y_continuous, n_bins=10)
+    assert np.isclose(weights.mean(), 1.0)
+    assert weights[-1] > weights[0]
+
+
+def test_fit_with_target_weights_falls_back_when_unsupported():
+    # An estimator whose fit() doesn't accept sample_weight must still get
+    # fit (unweighted, with a warning) rather than raising.
+    from sklearn.base import BaseEstimator, RegressorMixin
+    from sklearn.pipeline import Pipeline
+
+    class NoSampleWeightRegressor(RegressorMixin, BaseEstimator):
+        def fit(self, X, y):
+            self.mean_ = y.mean()
+            return self
+
+        def predict(self, X):
+            return np.full(len(X), self.mean_)
+
+    rng = np.random.RandomState(0)
+    X = rng.normal(size=(20, 3))
+    y = rng.normal(size=20)
+    pipe = Pipeline([("reg", NoSampleWeightRegressor())])
+    with pytest.warns(UserWarning, match="does not accept sample_weight"):
+        _fit_with_optional_target_weights(
+            pipe, X, y, balance_target=True, target_n_bins=5
+        )
+    assert hasattr(pipe, "predict")
+    assert pipe.predict(X).shape == (20,)
+
+
+def test_regressor_with_target_balancing(tmpdir):
+    clfs = [
+        ("sklearn.ensemble", "RandomForestRegressor", {"n_estimators": 10}),
+    ]
+    csv_file = os.path.join(os.path.dirname(__file__), "data", "diabetes_table.csv")
+    inputs = {
+        "filename": csv_file,
+        "x_indices": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        "target_vars": ["target"],
+        "group_var": None,
+        "n_splits": 2,
+        "test_size": 0.2,
+        "clf_info": clfs,
+        "permute": [False],
+        "gen_feature_importance": False,
+        "gen_permutation_importance": False,
+        "permutation_importance_n_repeats": 5,
+        "permutation_importance_scoring": "accuracy",
+        "gen_shap": False,
+        "nsamples": 15,
+        "l1_reg": "aic",
+        "plot_top_n_shap": 10,
+        "metrics": ["explained_variance_score"],
+        "balance_target": True,
+        "target_n_bins": 5,
+    }
+    spec = gen_workflow(inputs, cache_dir=tmpdir)
+    result = run_workflow(spec, "debug", {})
+    assert hasattr(result.outputs.model[0], "predict")
+    assert isinstance(result.outputs.model[0].predict(np.ones((1, 10))), np.ndarray)
 
 
 def test_regressor(tmpdir):

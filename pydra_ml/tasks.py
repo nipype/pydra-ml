@@ -2,8 +2,8 @@
 
 import typing as ty
 
+from imblearn.pipeline import Pipeline
 from pydra.utils.hash import Cache, register_serializer
-from sklearn.pipeline import Pipeline
 
 
 @register_serializer
@@ -73,7 +73,7 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
     :return: outputs, trained classifier with sample indices
     """
     import numpy as np
-    from sklearn.pipeline import Pipeline
+    from imblearn.pipeline import Pipeline
 
     def to_instance(clf_info):
         mod = __import__(clf_info[0], fromlist=[clf_info[1]])
@@ -148,7 +148,7 @@ def get_feature_importance(
     ----------
     permute : bool
         Whether or not to run the model in permuted mode
-    model : tuple(sklearn.pipeline.Pipeline, list, list)
+    model : tuple(imblearn.pipeline.Pipeline, list, list)
         The model to compute feature importance for
     gen_feature_importance : bool
         Whether or not to generate the feature importance
@@ -160,7 +160,7 @@ def get_feature_importance(
     if permute or not gen_feature_importance:
         return []
     pipeline, train_index, test_index = model
-    pipeline_steps = pipeline.steps[1][1]
+    pipeline_steps = pipeline.steps[-1][1]
     model_name = str(pipeline_steps)
     # Each model type may have a different method or none at all.
     # See here for sklearn models: https://scikit-learn.org/stable/supervised_learning.html
@@ -194,7 +194,7 @@ def get_feature_importance(
                 could not be computed and will be returned as an empty list
                 because after running this
 
-                pipeline_steps = pipeline.steps[1][1]
+                pipeline_steps = pipeline.steps[-1][1]
 
                 none of the following methods worked:
 
@@ -227,7 +227,7 @@ def get_permutation_importance(
 
     pipe, train_index, test_index = model
     results = permutation_importance(
-        pipe.steps[1][1],
+        pipe.steps[-1][1],
         X[test_index],
         y[test_index],
         scoring=permutation_importance_scoring,
@@ -270,7 +270,7 @@ def create_model(X, y, clf_info, permute):
     :return: training error, classifier
     """
     import numpy as np
-    from sklearn.pipeline import Pipeline
+    from imblearn.pipeline import Pipeline
 
     def to_instance(clf_info):
         mod = __import__(clf_info[0], fromlist=[clf_info[1]])

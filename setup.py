@@ -1,24 +1,19 @@
 #!/usr/bin/env python
-# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
-# vi: set ft=python sts=4 ts=4 sw=4 et:
-"""Pydra: Dataflow Engine"""
+"""Thin shim so versioneer can compute the version and freeze it at build time.
+
+All other metadata lives in pyproject.toml.
+"""
+import os
 import sys
 
 from setuptools import setup
 
-import versioneer
+# PEP 517 build backends exec this file without the project root on
+# sys.path, so the vendored versioneer.py next to this file wouldn't
+# otherwise be importable.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Give setuptools a hint to complain if it's too old a version
-# 30.3.0 allows us to put most metadata in setup.cfg
-# Should match pyproject.toml
-SETUP_REQUIRES = ["setuptools >= 30.3.0"]
-# This enables setuptools to install wheel on-the-fly
-SETUP_REQUIRES += ["wheel"] if "bdist_wheel" in sys.argv else []
+import versioneer  # noqa: E402
 
 if __name__ == "__main__":
-    setup(
-        name="pydra_ml",
-        version=versioneer.get_version(),
-        cmdclass=versioneer.get_cmdclass(),
-        setup_requires=SETUP_REQUIRES,
-    )
+    setup(version=versioneer.get_version(), cmdclass=versioneer.get_cmdclass())

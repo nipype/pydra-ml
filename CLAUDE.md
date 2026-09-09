@@ -78,11 +78,14 @@ pydraml -s specification.json -p dask "address=tcp://host:8786"
 }
 ```
 
-Classifiers are dynamically instantiated via `__import__()`. A nested list means a scikit-learn `Pipeline`.
+Classifiers are dynamically instantiated via `__import__()`. A nested list is built into an
+`imblearn.pipeline.Pipeline` (a superset of `sklearn.pipeline.Pipeline`), so steps can mix
+regular transformers with imbalanced-learn samplers (e.g. `imblearn.over_sampling.SMOTE`),
+which only implement `fit_resample`, not `transform`.
 
 ### Code style
 
-- Formatting: **black** (line length from flake8 config: max 99 chars)
-- Linting: **flake8** (excludes `__init__.py` and `tests/`)
+- Formatting: **black** (default line length)
+- Linting: **flake8** (max 99 chars, config in `.flake8`; excludes `__init__.py` and `tests/`)
 - Imports: **isort** (Black profile)
 - Logging: controlled via `PYDRAML_LOG_LEVEL` environment variable

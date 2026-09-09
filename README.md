@@ -41,7 +41,7 @@ number of iterations (`n_splits`) is increased. Just change spec file and it wil
 
 ### Installation
 
-pydraml requires Python 3.7+.
+pydraml requires Python 3.11+.
 
 ```
 pip install pydra-ml
@@ -148,6 +148,23 @@ example:
    ["sklearn.tree", "DecisionTreeClassifier", {"max_depth": 5}]
   ]
 ```
+
+Pipeline steps are built into an [imbalanced-learn](https://imbalanced-learn.org)
+`Pipeline`, a drop-in superset of scikit-learn's that also accepts samplers (steps
+that only implement `fit_resample`, not `transform`). This lets you rebalance the
+training data (samplers are skipped at prediction time) as part of the pipeline,
+for example with SMOTE:
+
+```
+ [ ["imblearn.over_sampling", "SMOTE"],
+   ["sklearn.preprocessing", "StandardScaler"],
+   ["sklearn.tree", "DecisionTreeClassifier", {"max_depth": 5}]
+  ]
+```
+
+Alternatively, most scikit-learn classifiers accept a `class_weight` parameter
+(e.g., `{"class_weight": "balanced"}`) as a resampling-free way to handle
+imbalanced classes.
 
 ## Example specification:
 

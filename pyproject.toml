@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools >= 64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pydra-ml"
+description = "A Pydra-based application for reproducible machine learning model comparisons using scikit-learn"
+readme = { file = "README.md", content-type = "text/markdown" }
+license = { text = "Apache License, 2.0" }
+authors = [{ name = "nipype developers", email = "neuroimaging@python.org" }]
+maintainers = [{ name = "nipype developers", email = "neuroimaging@python.org" }]
+requires-python = ">= 3.11"
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "pydra >= 1.0a10",
+    "psutil",
+    "scikit-learn",
+    "imbalanced-learn",
+    "seaborn",
+    "click",
+    "shap",
+]
+
+[project.urls]
+Homepage = "https://github.com/nipype/pydra-ml"
+Repository = "https://github.com/nipype/pydra-ml"
+
+[project.scripts]
+pydraml = "pydra_ml.cli:main"
+
+[project.optional-dependencies]
+doc = [
+    "packaging",
+    "sphinx >= 2.1.2",
+    "sphinx_rtd_theme",
+    "sphinxcontrib-apidoc ~= 0.3.0",
+    "sphinxcontrib-napoleon",
+    "sphinxcontrib-versioning",
+]
+docs = ["pydra-ml[doc]"]
+test = [
+    "pytest >= 4.4.0",
+    "pytest-env",
+    "pytest-xdist",
+    "pytest-rerunfailures",
+]
+tests = ["pydra-ml[test]"]
+dev = ["pydra-ml[test]", "black", "pre-commit"]
+all = ["pydra-ml[doc,dev]"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.package-data]
+pydra_ml = ["tests/data/*.csv"]
+
+[tool.versioneer]
+VCS = "git"
+style = "pep440"
+versionfile_source = "pydra_ml/_version.py"
+versionfile_build = "pydra_ml/_version.py"
+tag_prefix = ""
+parentdir_prefix = ""
+
+[tool.isort]
+profile = "black"
+skip = ["pydra_ml/_version.py", "versioneer.py"]

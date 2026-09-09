@@ -46,6 +46,47 @@ def test_classifier(tmpdir):
     assert isinstance(result.outputs.model[1].predict(np.ones((1, 10))), np.ndarray)
 
 
+def test_classifier_with_resampling(tmpdir):
+    # imbalanced-learn samplers (e.g. RandomOverSampler) only implement
+    # fit_resample, not transform, so they can only be used as pipeline
+    # steps if the pipeline is imblearn's (a superset of sklearn's).
+    clfs = [
+        [
+            ["imblearn.over_sampling", "RandomOverSampler"],
+            ["sklearn.preprocessing", "StandardScaler"],
+            ["sklearn.ensemble", "RandomForestClassifier", {"n_estimators": 10}],
+        ],
+    ]
+    csv_file = os.path.join(os.path.dirname(__file__), "data", "breast_cancer.csv")
+    inputs = {
+        "filename": csv_file,
+        "x_indices": list(range(10)),
+        "target_vars": ("target",),
+        "group_var": None,
+        "n_splits": 2,
+        "test_size": 0.2,
+        "clf_info": clfs,
+        "permute": [False],
+        "gen_feature_importance": True,
+        "gen_permutation_importance": False,
+        "permutation_importance_n_repeats": 5,
+        "permutation_importance_scoring": "accuracy",
+        "gen_shap": False,
+        "nsamples": 15,
+        "l1_reg": "aic",
+        "plot_top_n_shap": 16,
+        "metrics": ["roc_auc_score", "accuracy_score"],
+    }
+    spec = gen_workflow(inputs, cache_dir=tmpdir)
+    result = run_workflow(spec, "debug", {})
+    assert hasattr(result.outputs.model[0], "predict")
+    assert isinstance(result.outputs.model[0].predict(np.ones((1, 10))), np.ndarray)
+    # steps[-1] must resolve to the RandomForestClassifier, not the
+    # StandardScaler, now that the pipeline has a sampler step in front.
+    feature_importance = result.outputs.feature_importance[0][0]
+    assert len(feature_importance) == 10
+
+
 def test_regressor(tmpdir):
     clfs = [
         [

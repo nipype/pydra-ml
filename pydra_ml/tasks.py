@@ -61,7 +61,65 @@ def gen_splits(n_splits, test_size, X, Y, groups=None, random_state=0):
     return train_test_splits, split_indices
 
 
-def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
+def _target_sample_weights(y, n_bins=10):
+    """Inverse-frequency sample weights for a skewed/imbalanced target.
+
+    A classification target (at most `n_bins` unique values) is weighted by
+    exact inverse class frequency. A continuous regression target is binned
+    into `n_bins` equal-width bins first, then weighted by inverse bin
+    frequency, the regression analogue of class rebalancing (rare target
+    ranges get upweighted same as rare classes). Weights are normalized to
+    a mean of 1 so they don't change the overall loss scale.
+
+    :param y: Target values for the samples being fit
+    :param n_bins: Number of bins to discretize a continuous target into
+    :return: Per-sample weights, same length as y
+    """
+    import numpy as np
+
+    y = np.asarray(y, dtype=float)
+    uniques, inverse, counts = np.unique(y, return_inverse=True, return_counts=True)
+    if uniques.size > n_bins:
+        bin_counts, edges = np.histogram(y, bins=n_bins)
+        inverse = np.clip(np.digitize(y, edges[1:-1]), 0, n_bins - 1)
+        counts = bin_counts
+    weights = 1.0 / counts[inverse]
+    return weights * (len(weights) / weights.sum())
+
+
+def _fit_with_optional_target_weights(pipe, X, y, balance_target, target_n_bins):
+    """Fit pipe, optionally weighting samples by inverse target frequency.
+
+    Falls back to an unweighted fit (with a warning) if the final estimator
+    doesn't accept sample_weight.
+    """
+    if not balance_target:
+        pipe.fit(X, y)
+        return
+    weights = _target_sample_weights(y, n_bins=target_n_bins)
+    final_step_name = pipe.steps[-1][0]
+    try:
+        pipe.fit(X, y, **{f"{final_step_name}__sample_weight": weights})
+    except TypeError as e:
+        import warnings
+
+        warnings.warn(
+            f"balance_target is set, but {pipe.steps[-1][1]} does not accept "
+            f"sample_weight, so it will be fit unweighted instead.\n\t{e}\n"
+        )
+        pipe.fit(X, y)
+
+
+def train_test_kernel(
+    X,
+    y,
+    train_test_split,
+    split_index,
+    clf_info,
+    permute,
+    balance_target=False,
+    target_n_bins=10,
+):
     """Core model fitting and predicting function
 
     :param X: Input features
@@ -70,6 +128,10 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
     :param split_index: which index to use
     :param clf_info: how to construct the classifier
     :param permute: whether to run it in permuted mode or not
+    :param balance_target: whether to fit with inverse target-frequency
+        sample weights, to counter a skewed/imbalanced target
+    :param target_n_bins: number of bins to discretize a continuous target
+        into when computing balance_target weights
     :return: outputs, trained classifier with sample indices
     """
     import numpy as np
@@ -106,9 +168,12 @@ def train_test_kernel(X, y, train_test_split, split_index, clf_info, permute):
         # it's loaded as bytes, so we need to decode as utf-8
         X = np.array([str.encode(n[0]).decode("utf-8") for n in X])
     if permute:
-        pipe.fit(X[train_index], y[np.random.permutation(train_index)])
+        y_train = y[np.random.permutation(train_index)]
     else:
-        pipe.fit(X[train_index], y[train_index])
+        y_train = y[train_index]
+    _fit_with_optional_target_weights(
+        pipe, X[train_index], y_train, balance_target, target_n_bins
+    )
     predicted = pipe.predict(X[test_index])
     try:
         predicted_proba = pipe.predict_proba(X[test_index])
@@ -260,13 +325,17 @@ def get_shap(X, permute, model, gen_shap=False, nsamples="auto", l1_reg="aic"):
     return shaps
 
 
-def create_model(X, y, clf_info, permute):
+def create_model(X, y, clf_info, permute, balance_target=False, target_n_bins=10):
     """Train a model with all the data
 
     :param X: Input features
     :param y: Target variables
     :param clf_info: how to construct the classifier
     :param permute: whether to run it in permuted mode or not
+    :param balance_target: whether to fit with inverse target-frequency
+        sample weights, to counter a skewed/imbalanced target
+    :param target_n_bins: number of bins to discretize a continuous target
+        into when computing balance_target weights
     :return: training error, classifier
     """
     import numpy as np
@@ -299,8 +368,9 @@ def create_model(X, y, clf_info, permute):
 
     y = y.ravel()
     if permute:
-        pipe.fit(X, y[np.random.permutation(range(len(y)))])
+        y_fit = y[np.random.permutation(range(len(y)))]
     else:
-        pipe.fit(X, y)
+        y_fit = y
+    _fit_with_optional_target_weights(pipe, X, y_fit, balance_target, target_n_bins)
     predicted = pipe.predict(X)
     return (y, predicted), pipe

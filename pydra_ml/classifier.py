@@ -54,8 +54,19 @@ def TrainTestKernel(
     split_index: ty.Any,
     clf_info: ty.Any,
     permute: ty.Any,
+    balance_target: bool = False,
+    target_n_bins: int = 10,
 ) -> tuple[ty.Any, ty.Any]:
-    return train_test_kernel(X, y, train_test_split, split_index, clf_info, permute)
+    return train_test_kernel(
+        X,
+        y,
+        train_test_split,
+        split_index,
+        clf_info,
+        permute,
+        balance_target,
+        target_n_bins,
+    )
 
 
 @python.define(outputs={"score": ty.Any, "output": ty.Any})
@@ -109,9 +120,14 @@ def GetShap(
 
 @python.define(outputs={"output": ty.Any, "model": ty.Any})
 def CreateModel(
-    X: ty.Any, y: ty.Any, clf_info: ty.Any, permute: ty.Any
+    X: ty.Any,
+    y: ty.Any,
+    clf_info: ty.Any,
+    permute: ty.Any,
+    balance_target: bool = False,
+    target_n_bins: int = 10,
 ) -> tuple[ty.Any, ty.Any]:
-    return create_model(X, y, clf_info, permute)
+    return create_model(X, y, clf_info, permute, balance_target, target_n_bins)
 
 
 # --- Workflow definition ---
@@ -146,6 +162,8 @@ def MLWorkflow(
     nsamples: ty.Any,
     l1_reg: ty.Any,
     plot_top_n_shap: ty.Any,
+    balance_target: bool = False,
+    target_n_bins: int = 10,
 ) -> tuple[ty.Any, ty.Any, ty.Any, ty.Any, ty.Any, ty.Any, ty.Any]:
     readcsv = workflow.add(
         ReadFile(
@@ -175,6 +193,8 @@ def MLWorkflow(
             split_index=gensplit.split_indices,
             clf_info=clf_info,
             permute=permute,
+            balance_target=balance_target,
+            target_n_bins=target_n_bins,
         ).split("split_index", split_index=gensplit.split_indices),
         name="fit_clf",
     )
@@ -223,6 +243,8 @@ def MLWorkflow(
             y=readcsv.Y,
             clf_info=clf_info,
             permute=permute,
+            balance_target=balance_target,
+            target_n_bins=target_n_bins,
         ),
         name="create_model",
     )
@@ -272,6 +294,8 @@ def gen_workflow(inputs, cache_dir=None, cache_locations=None):
         nsamples=inputs["nsamples"],
         l1_reg=inputs["l1_reg"],
         plot_top_n_shap=inputs["plot_top_n_shap"],
+        balance_target=inputs.get("balance_target", False),
+        target_n_bins=inputs.get("target_n_bins", 10),
     ).split(["clf_info", "permute"], clf_info=clf_infos, permute=permutes)
     return WorkflowSpec(wf=wf, cache_dir=cache_dir, inputs=inputs)
 

@@ -47,12 +47,13 @@ pydraml -s specification.json -p dask "address=tcp://host:8786"
 
 - **`cli.py`** — Click-based CLI. Parses the JSON spec file, validates it, then calls `gen_workflow` / `run_workflow`.
 
-- **`sharp_test.py`** — Standalone SHARP (Split-HAlf RePeated) significance test for
-  comparing two models' cross-validated performance without the fold-dependence problem
-  that makes naive tests (like `report.py`'s pairwise empirical p-value) invalid. Not
-  wired into the pydra workflow; called directly (`sharp_compare` or
-  `split_half_repeated_cv` + `sharp_test`). See its module docstring for the important
-  calibration caveat.
+- **`sharp_test.py`** — Standalone, **experimental** SHARP (Split-HAlf RePeated)
+  significance test for comparing two models' cross-validated performance without the
+  fold-dependence problem that makes naive tests (like `report.py`'s pairwise empirical
+  p-value) invalid. Not wired into the pydra workflow; called directly (`sharp_compare`
+  or `split_half_repeated_cv` + `sharp_test`), and gated behind `experimental=True`
+  since it has a known, uncorrected anti-conservative miscalibration region — see its
+  module docstring before using or modifying it.
 
 ### Data flow
 

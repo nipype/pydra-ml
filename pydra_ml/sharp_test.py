@@ -18,40 +18,66 @@ Reference: Zeng, T., Li, H., Zhang, S. et al., Yeo, B.T.T. (2026),
 learning", bioRxiv, Methods Section 4.6.
 https://doi.org/10.64898/2026.05.17.724301
 
-CAVEAT: the paper's Methods Section 4.6 gives the model (the covariance
-structure summarized above), the SHARP estimator and its variance formula,
-and states that all reported results use a "score test" whose Z-score is
-D̄ over a standard error using null-restricted (mu=0) maximum-likelihood
+======================================================================
+EXPERIMENTAL -- DO NOT USE FOR A PUBLICATION-QUALITY SIGNIFICANCE CLAIM
+======================================================================
+
+The paper's Methods Section 4.6 gives the model (the covariance structure
+summarized above), the SHARP estimator and its variance formula, and
+states that all reported results use a "score test" whose Z-score is D̄
+over a standard error using null-restricted (mu=0) maximum-likelihood
 estimates of sigma2 and rho. It does not give the exact estimating
 equations (those are in Supplementary Methods S7, which was not
-reachable while implementing this: biorxiv.org blocks automated access,
-and no supplementary-file link was exposed via PMC or the bioRxiv API).
-This module's covariance structure, likelihood, and estimators are
+reachable while implementing this: biorxiv.org blocks automated access to
+the article itself and, separately, to its supplementary-material
+download, and no supplementary content was exposed via PMC or the
+bioRxiv API). This module's covariance structure and estimators are
 therefore our own derivation from the stated model, not a port of the
 paper's own code.
 
-We validated this implementation by simulating directly from the assumed
-covariance structure (see pydra_ml/tests/test_sharp.py) and checking false
-positive rates under the null. It is well-calibrated (false positive rate
-near the nominal alpha) when the fitted between-repetition correlation
-(rho) is moderate to large (roughly >= 0.3 in our simulations), and
-conservative -- reduced false positive rate *and* reduced power, never
-anti-conservative -- when rho is small (near its structural lower bound
-of -1 / (2 * (J - 1))). We were not able to identify a fix that resolves
-this without access to the paper's own derivation; a method-of-moments
-alternative we tried was worse (frequently negative variance estimates
-requiring clipping, which made the test anti-conservative instead). Until
-this is resolved, prefer this test when you expect non-trivial
-correlation between repetitions (the common case when repetitions reuse
-overlapping data, which is the whole reason SHARP exists), and treat a
-result with rho close to its lower bound with extra caution.
+An independent statistician review confirmed the covariance-structure
+derivation, but found that naive maximum-likelihood estimation of
+(sigma2, rho) is structurally flawed here in two ways: (1) null-restricted
+joint ML of (mu=0, sigma2, rho) makes the test statistic self-referential
+(its variance estimate is driven by the same residual being tested); (2)
+unrestricted/REML ML frequently converges to (or past) the boundary where
+Var(D̄) is exactly zero, which can silently collapse the confidence
+interval to near-zero width. This module uses a closed-form REML-type
+estimator instead (no numerical optimizer, so no convergence risk;
+doesn't depend on the residual being tested, so it isn't
+self-referential), floored at rho=0 (correlation from repeated reuse of
+overlapping data should not be negative) to keep Var(D̄) away from its
+zero boundary.
+
+That floor avoids the worst failure (the collapsed CI), but leaves a
+real, uncorrected miscalibration behind: simulating directly from the
+assumed covariance structure (pydra_ml/tests/test_sharp.py) shows the
+false positive rate is near the nominal alpha when the true
+between-repetition correlation is 0 or larger (roughly rho <= 0 or
+rho >= 0.3 in our simulations), but *anti-conservative* -- up to ~3-4x
+the nominal alpha -- for small positive correlation (roughly rho in
+[0.05, 0.2]), which is arguably the most common real-world case
+(repeated CV on overlapping data usually induces at least mild positive
+correlation). We tried three different bootstrap-calibration schemes to
+correct this and none reliably did (one made rho=0 much worse); properly
+closing this gap looks like the kind of boundary-corrected reference
+distribution problem covered in, e.g., Self & Liang (1987) for testing a
+variance component at its boundary, which is beyond what we could derive
+and validate here.
+
+Given this, `sharp_test`/`sharp_compare` require `experimental=True` to
+call, so this can't be reached accidentally or hold up as a validated
+default. Treat any result as a rough, unverified signal alongside other
+evidence, not a standalone significance claim -- and if you can get the
+paper's Supplementary Methods S7 (e.g. by asking the corresponding
+author), we would very much like to fix this properly.
 """
 
 import dataclasses
 import typing as ty
 
 import numpy as np
-from scipy import optimize, stats
+from scipy import stats
 
 
 @dataclasses.dataclass
@@ -63,114 +89,77 @@ class SharpTestResult:
     z: float
     p_value: float
     ci: ty.Tuple[float, float]
-    sigma2_null: float
-    rho_null: float
     sigma2: float
     rho: float
     n_repeats: int
 
 
-def _log_lik_null(sigma2, rho, J, s_bar, ss_s, ss_delta):
-    """Gaussian log-likelihood (up to an additive constant) for the SHARP
-    covariance structure under the null hypothesis mu=0, as a function of
-    (sigma2, rho).
+def _fit_sigma2_rho(J, ss_s, ss_delta):
+    """Closed-form REML-type estimate of (sigma2, rho), floored at rho=0.
 
-    `s_bar`, `ss_s` and `ss_delta` are sufficient statistics of, respectively,
-    the mean, the within-sum-of-squares of S_j = diff_a[j] + diff_b[j], and
-    the sum-of-squares of Delta_j = diff_a[j] - diff_b[j] (already mean zero
-    by construction, regardless of the true mu). With mu fixed at 0, s_bar
-    is a genuine residual from its null-hypothesis mean of 0.
+    `ss_s` and `ss_delta` are the sum-of-squares of, respectively, S_j =
+    diff_a[j] + diff_b[j] (deviations from its own mean) and Delta_j =
+    diff_a[j] - diff_b[j] (already mean zero by construction). Neither
+    depends on the mean performance difference mu, so this estimate does
+    not depend on the value being tested (avoiding the self-referential
+    degeneracy of a null-restricted or profiled joint ML fit -- see the
+    module docstring).
+
+    Using the per-direction unbiased estimates sigma2_hat = ss_delta / (2J)
+    (J degrees of freedom) and lambda2_hat = ss_s / (J - 1) (J - 1 degrees
+    of freedom), the implied unconstrained estimate of lambda1 = Var(S_j)
+    + (J - 1) * Cov(S_j, S_j') reduces to the exact closed form
+    lambda1_hat = ss_delta - ss_s (derived from lambda1 = 2*J*sigma2 -
+    (J - 1)*lambda2). When this is smaller than lambda1 at rho=0 --
+    which happens often when the true rho is small, since ss_s and
+    ss_delta are then just noisy estimates of the same quantity 2*sigma2
+    -- the closed-form optimum lies at rho < 0, which is floored to 0
+    (Var(D̄) is otherwise driven towards its zero boundary; see the module
+    docstring).
+
+    :return: (sigma2_hat, rho_hat, var_d_bar), where var_d_bar is
+        Var(D̄) = sigma2_hat * (1 / (2J) + (J - 1) / J * rho_hat) evaluated
+        at these estimates.
     """
-    lam1 = 2 * sigma2 * (1 + 2 * rho * (J - 1))
-    lam2 = 2 * sigma2 * (1 - 2 * rho)
-    if lam1 <= 0 or lam2 <= 0 or sigma2 <= 0:
-        return -np.inf
-    ll = -0.5 * np.log(lam1 / J) - 0.5 * J * s_bar**2 / lam1
-    ll += -0.5 * (J - 1) * np.log(lam2) - 0.5 * ss_s / lam2
-    ll += -0.5 * J * np.log(2 * sigma2) - 0.5 * ss_delta / (2 * sigma2)
-    return ll
+    sigma2_unc = ss_delta / (2 * J)
+    lam1_unc = ss_delta - ss_s
+    lam1_floor = 2 * sigma2_unc  # lambda1 at rho=0
+    if lam1_unc >= lam1_floor:
+        sigma2_hat = sigma2_unc
+        rho_hat = (lam1_unc / (2 * sigma2_unc) - 1) / (2 * (J - 1))
+        var_d_bar = lam1_unc / (4 * J)
+    else:
+        rho_hat = 0.0
+        sigma2_hat = (ss_s + ss_delta) / (2 * (2 * J - 1))
+        var_d_bar = sigma2_hat / (2 * J)
+    return sigma2_hat, rho_hat, var_d_bar
 
 
-def _log_lik_reml(sigma2, rho, J, ss_s, ss_delta):
-    """Restricted (residual) log-likelihood for (sigma2, rho), leaving mu
-    unrestricted.
+def sharp_test(diff_a, diff_b, alpha=0.05, experimental=False):
+    """SHARP test for a mean cross-validated performance difference.
 
-    Ordinary (non-restricted) ML estimation of (sigma2, rho) with mu also
-    free is degenerate here: profiling mu out exactly zero-fits the
-    mean-direction residual for any (sigma2, rho), so the profiled
-    likelihood has no interior maximum and diverges towards the boundary
-    rho -> -1 / (2 * (J - 1)) (where the variance of the mean estimator
-    goes to 0). REML avoids this by dropping the mean-direction term
-    entirely and fitting (sigma2, rho) only from the directions of the
-    data orthogonal to the mean (ss_s, ss_delta), which don't depend on mu.
-    """
-    lam2 = 2 * sigma2 * (1 - 2 * rho)
-    if lam2 <= 0 or sigma2 <= 0:
-        return -np.inf
-    ll = -0.5 * (J - 1) * np.log(lam2) - 0.5 * ss_s / lam2
-    ll += -0.5 * J * np.log(2 * sigma2) - 0.5 * ss_delta / (2 * sigma2)
-    return ll
-
-
-def _fit_rho_bounds(J):
-    """Range of rho for which both eigenvalues of the SHARP covariance
-    structure (lam1, lam2) are positive."""
-    return -1.0 / (2 * (J - 1)), 0.5
-
-
-def _minimize_sigma2_rho(neg_ll, J, sigma2_0):
-    """Minimize `neg_ll(sigma2, rho)`, reparameterized to an unconstrained
-    optimization so rho stays strictly inside its valid range."""
-    rho_lo, rho_hi = _fit_rho_bounds(J)
-
-    def unpack(params):
-        log_sigma2, rho_logit = params
-        sigma2 = np.exp(log_sigma2)
-        rho = rho_lo + (rho_hi - rho_lo) / (1 + np.exp(-rho_logit))
-        return sigma2, rho
-
-    def neg_ll_reparam(params):
-        return neg_ll(*unpack(params))
-
-    result = optimize.minimize(
-        neg_ll_reparam, x0=[np.log(sigma2_0), 0.0], method="Nelder-Mead"
-    )
-    return unpack(result.x)
-
-
-def _fit_sigma2_rho_null(J, s_bar, ss_s, ss_delta):
-    """Null-restricted (mu=0) MLE of (sigma2, rho), used for the score test."""
-    sigma2_0 = max(ss_delta / (2 * J), 1e-8)
-    return _minimize_sigma2_rho(
-        lambda sigma2, rho: -_log_lik_null(sigma2, rho, J, s_bar, ss_s, ss_delta),
-        J,
-        sigma2_0,
-    )
-
-
-def _fit_sigma2_rho_reml(J, ss_s, ss_delta):
-    """REML estimate of (sigma2, rho) with mu unrestricted, used for the CI."""
-    sigma2_0 = max(ss_delta / (2 * J), 1e-8)
-    return _minimize_sigma2_rho(
-        lambda sigma2, rho: -_log_lik_reml(sigma2, rho, J, ss_s, ss_delta),
-        J,
-        sigma2_0,
-    )
-
-
-def sharp_test(diff_a, diff_b, alpha=0.05):
-    """SHARP score test for a mean cross-validated performance difference.
+    EXPERIMENTAL -- see the module docstring for a known, uncorrected
+    anti-conservative miscalibration region (small positive between-
+    repetition correlation). Must be called with experimental=True.
 
     :param diff_a: Per-repetition fold-averaged performance differences
         (model 1 minus model 2) from split half A. Length J.
     :param diff_b: Same, from split half B. Length J.
     :param alpha: Significance level for the confidence interval.
+    :param experimental: Must be set to True to acknowledge this is an
+        experimental, not-fully-validated implementation (see the module
+        docstring).
     :return: SharpTestResult with the mean difference, Z-score, two-sided
-        p-value, a (1 - alpha) confidence interval, and the fitted variance
-        (sigma2) and between-repetition correlation (rho), both under the
-        null hypothesis (mean_diff=0, used for the p-value) and unrestricted
-        (used for the confidence interval).
+        p-value, a (1 - alpha) confidence interval, and the fitted
+        variance (sigma2) and between-repetition correlation (rho).
     """
+    if not experimental:
+        raise ValueError(
+            "sharp_test is experimental and not fully validated (see the "
+            "module docstring for a known anti-conservative miscalibration "
+            "region). Call with experimental=True to acknowledge this and "
+            "proceed."
+        )
     diff_a = np.asarray(diff_a, dtype=float)
     diff_b = np.asarray(diff_b, dtype=float)
     if diff_a.shape != diff_b.shape or diff_a.ndim != 1:
@@ -186,27 +175,32 @@ def sharp_test(diff_a, diff_b, alpha=0.05):
     ss_delta = np.sum(delta**2)
     d_bar = s_bar / 2  # SHARP (GLS) estimator of the mean performance difference
 
-    sigma2_null, rho_null = _fit_sigma2_rho_null(J, s_bar, ss_s, ss_delta)
-    var_null = sigma2_null * (1 / (2 * J) + (J - 1) / J * rho_null)
-    z = d_bar / np.sqrt(var_null)
+    sigma2_hat, rho_hat, var_d_bar = _fit_sigma2_rho(J, ss_s, ss_delta)
+    z = d_bar / np.sqrt(var_d_bar)
     p_value = 2 * stats.norm.sf(np.abs(z))
-
-    sigma2, rho = _fit_sigma2_rho_reml(J, ss_s, ss_delta)
-    var_unrestricted = sigma2 * (1 / (2 * J) + (J - 1) / J * rho)
-    z_crit = stats.norm.ppf(1 - alpha / 2)
-    margin = z_crit * np.sqrt(var_unrestricted)
+    margin = stats.norm.ppf(1 - alpha / 2) * np.sqrt(var_d_bar)
 
     return SharpTestResult(
         mean_diff=float(d_bar),
         z=float(z),
         p_value=float(p_value),
         ci=(float(d_bar - margin), float(d_bar + margin)),
-        sigma2_null=float(sigma2_null),
-        rho_null=float(rho_null),
-        sigma2=float(sigma2),
-        rho=float(rho),
+        sigma2=float(sigma2_hat),
+        rho=float(rho_hat),
         n_repeats=J,
     )
+
+
+def _score_predictions(metric, y_true, y_pred, y_proba):
+    """Compute a named sklearn.metrics score, mirroring tasks.calc_metric's
+    convention: roc_auc_score uses predicted probabilities of the positive
+    class when available, everything else uses hard predictions."""
+    import sklearn.metrics
+
+    metric_func = getattr(sklearn.metrics, metric)
+    if metric == "roc_auc_score" and y_proba is not None:
+        return metric_func(y_true, y_proba[:, 1])
+    return metric_func(y_true, y_pred)
 
 
 def split_half_repeated_cv(
@@ -235,14 +229,15 @@ def split_half_repeated_cv(
         format in the README)
     :param clf_info_2: clf_info for the second model
     :param metric: name of a function in sklearn.metrics (e.g.
-        "roc_auc_score", "accuracy_score")
+        "roc_auc_score", "accuracy_score") -- the same convention used
+        elsewhere in this package's spec files (not an sklearn scorer
+        registry key).
     :param n_repeats: number of split-half repetitions (J in sharp_test)
     :param n_folds: number of cross-validation folds within each half
     :param random_state: seed for the half splits and fold splits
     :return: (diff_a, diff_b), each a length-`n_repeats` array, suitable for
         sharp_test
     """
-    from sklearn.metrics import get_scorer
     from sklearn.model_selection import KFold
 
     from .tasks import build_pipeline
@@ -250,23 +245,27 @@ def split_half_repeated_cv(
     X = np.asarray(X)
     y = np.asarray(y).ravel()
     n_samples = X.shape[0]
-    scorer = get_scorer(metric)
     rng = np.random.RandomState(random_state)
+
+    def fit_and_score(clf_info, train_idx, test_idx):
+        pipe = build_pipeline(clf_info)
+        pipe.fit(X[train_idx], y[train_idx])
+        y_pred = pipe.predict(X[test_idx])
+        try:
+            y_proba = pipe.predict_proba(X[test_idx])
+        except AttributeError:
+            y_proba = None
+        return _score_predictions(metric, y[test_idx], y_pred, y_proba)
 
     def half_fold_diff(indices):
         kf = KFold(n_splits=n_folds, shuffle=True, random_state=rng.randint(2**32 - 1))
         fold_diffs = []
         for train_idx, test_idx in kf.split(indices):
             train_idx, test_idx = indices[train_idx], indices[test_idx]
-            score_1 = _fit_and_score(clf_info_1, X, y, train_idx, test_idx, scorer)
-            score_2 = _fit_and_score(clf_info_2, X, y, train_idx, test_idx, scorer)
+            score_1 = fit_and_score(clf_info_1, train_idx, test_idx)
+            score_2 = fit_and_score(clf_info_2, train_idx, test_idx)
             fold_diffs.append(score_1 - score_2)
         return np.mean(fold_diffs)
-
-    def _fit_and_score(clf_info, X, y, train_idx, test_idx, scorer):
-        pipe = build_pipeline(clf_info)
-        pipe.fit(X[train_idx], y[train_idx])
-        return scorer(pipe, X[test_idx], y[test_idx])
 
     diff_a = np.empty(n_repeats)
     diff_b = np.empty(n_repeats)
@@ -289,9 +288,14 @@ def sharp_compare(
     n_folds=5,
     alpha=0.05,
     random_state=None,
+    experimental=False,
 ):
     """Compare two models with the SHARP test, running the split-half
     repeated cross-validation procedure and the test in one call.
+
+    EXPERIMENTAL -- see the module docstring and sharp_test for a known,
+    uncorrected anti-conservative miscalibration region. Must be called
+    with experimental=True.
 
     See `split_half_repeated_cv` and `sharp_test` for parameter details.
 
@@ -307,4 +311,4 @@ def sharp_compare(
         n_folds=n_folds,
         random_state=random_state,
     )
-    return sharp_test(diff_a, diff_b, alpha=alpha)
+    return sharp_test(diff_a, diff_b, alpha=alpha, experimental=experimental)

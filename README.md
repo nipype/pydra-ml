@@ -348,7 +348,7 @@ without null distribution trained on permuted labels)
         summary statistics for all features (set to 1.0) or only the top N most
         important features for better visualization.
 
-## Significance testing
+## Significance testing (experimental)
 
 The `stats-{metric}` pairwise comparison described above uses an empirical
 p-value across bootstrapping splits (Ojala & Garriga, 2010), which — like most
@@ -359,7 +359,9 @@ tests in biomedical machine learning"](https://doi.org/10.64898/2026.05.17.72430
 found this ignored-fold-dependence problem in 97% of a sample of 210
 high-impact studies, and shows it inflates false positive rates. The same
 paper proposes the SHARP (Split-HAlf RePeated) test to address this, which
-`pydra_ml.sharp_test` implements:
+`pydra_ml.sharp_test` implements — **as an experimental, not-fully-validated
+approximation** (see the caveat below), gated behind an explicit
+`experimental=True`:
 
 ```python
 from pydra_ml.sharp_test import sharp_compare
@@ -371,6 +373,7 @@ result = sharp_compare(
     metric="roc_auc_score",
     n_repeats=30,
     n_folds=5,
+    experimental=True,
 )
 print(result.mean_diff, result.p_value, result.ci)
 ```
@@ -380,15 +383,22 @@ print(result.mean_diff, result.p_value, result.ci)
 them separately if you already have precomputed per-repetition performance
 differences from split halves A and B.
 
-**Caveat**: this is our own derivation from the equations and covariance
-structure given in the paper's Methods Section 4.6, not a port of the
-paper's own code — the exact estimating equations are in a Supplementary
-Methods section we could not access (see `pydra_ml/sharp_test.py` for
-details). Simulation-based validation
-(`pydra_ml/tests/test_sharp.py`) shows it controls the false positive rate
-near the nominal level when the fitted between-repetition correlation is
-moderate to large, and is conservative (never anti-conservative) when that
-correlation is small.
+**Caveat — do not use this for a publication-quality significance claim.**
+This is our own derivation from the equations and covariance structure given
+in the paper's Methods Section 4.6, not a port of the paper's own code — the
+exact estimating equations are in a Supplementary Methods section we could
+not access. An independent statistician review confirmed the covariance
+derivation but found the natural maximum-likelihood estimators are
+structurally flawed here (self-referential, or prone to collapsing the
+confidence interval to near-zero width); this module instead uses a
+closed-form estimator that avoids both failures, at the cost of a real,
+uncorrected gap: simulation (`pydra_ml/tests/test_sharp.py`) shows the false
+positive rate is near nominal when the fitted between-repetition correlation
+is 0 or (roughly) >= 0.3, but can be *anti-conservative* — up to ~3-4x
+nominal — for small positive correlation (roughly 0.05–0.2), which is
+arguably the common case. See `pydra_ml/sharp_test.py`'s module docstring
+for the full analysis. Treat any result as a rough, unverified signal
+alongside other evidence.
 
 ## Debugging
 

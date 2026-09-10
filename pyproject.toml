@@ -28,6 +28,7 @@ dependencies = [
     "psutil",
     "scikit-learn",
     "imbalanced-learn",
+    "scipy",
     "seaborn",
     "click",
     "shap",
@@ -80,3 +81,6 @@ parentdir_prefix = ""
 [tool.isort]
 profile = "black"
 skip = ["pydra_ml/_version.py", "versioneer.py"]
+
+[tool.codespell]
+ignore-words-list = "fpr"

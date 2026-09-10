@@ -348,6 +348,70 @@ without null distribution trained on permuted labels)
         summary statistics for all features (set to 1.0) or only the top N most
         important features for better visualization.
 
+## Significance testing (experimental)
+
+The `stats-{metric}` pairwise comparison described above uses an empirical
+p-value across bootstrapping splits (Ojala & Garriga, 2010), which — like most
+significance tests reported in the ML literature — does not account for the
+correlation between splits/folds that share underlying data. Zeng, Li,
+Zhang et al., Yeo, B.T.T. (2026), ["Widespread use of invalid statistical
+tests in biomedical machine learning"](https://doi.org/10.64898/2026.05.17.724301),
+found this ignored-fold-dependence problem in 97% of a sample of 210
+high-impact studies, and shows it inflates false positive rates. The same
+paper proposes the SHARP (Split-HAlf RePeated) test to address this, which
+`pydra_ml.sharp_test` implements — **as an experimental reimplementation**
+(see the caveat below), gated behind an explicit `experimental=True`:
+
+```python
+from pydra_ml.sharp_test import sharp_compare
+
+result = sharp_compare(
+    X, y,
+    clf_info_1=("sklearn.ensemble", "RandomForestClassifier", {"n_estimators": 100}),
+    clf_info_2=("sklearn.linear_model", "LogisticRegression"),
+    metric="roc_auc_score",
+    n_repeats=30,
+    n_folds=5,
+    experimental=True,
+)
+print(result.mean_diff, result.p_value, result.ci, result.rho)
+```
+
+`sharp_compare` runs the split-half repeated cross-validation procedure
+(`split_half_repeated_cv`) and the test itself (`sharp_test`) in one call; call
+them separately if you already have precomputed per-repetition performance
+differences from split halves A and B.
+
+Of the several SHARP variants in the paper, this implements the *score test* —
+the one the paper selects and uses for all of its own reported results: the
+nuisance parameters (per-repetition variance `sigma2` and between-repetition
+correlation `rho`) are re-estimated by maximum likelihood with the mean pinned
+at the null, and the confidence interval is obtained by inverting the same
+test.
+
+**Caveat — experimental, and conservative rather than exact.** This is an
+independent reimplementation of a method from a preprint that has not been
+peer reviewed, with no reference implementation to check against. We validated
+it by simulating directly from the covariance structure the method assumes
+(`pydra_ml/tests/test_sharp.py`). Two things came out of that:
+
+* It does not over-reject. Across a grid of 7 repetition counts (J = 10 … 300)
+  × 17 correlations (rho = 0 … 0.49), 4000 draws per cell, the false positive
+  rate never exceeded 0.055 against a nominal 0.05, and confidence-interval
+  coverage never fell below 0.942 against a nominal 0.95. Replicating the
+  paper's own toy setup (J = 300) reproduces the tight cluster around nominal
+  it reports for the score test.
+* It *is* markedly conservative when the fitted `rho` is small, increasingly so
+  as `n_repeats` shrinks — the false positive rate falls to essentially zero
+  for rho <= 0.03 at every J tested — and pays for that in power. A difference
+  an oracle test would detect 80% of the time can be missed almost always at
+  rho near zero.
+
+So: a rejection from this test is meaningful, a non-rejection is weak evidence.
+Check `result.rho` and `result.n_repeats` against the calibration table in
+`pydra_ml/sharp_test.py`'s module docstring, which has the full numbers, before
+reading anything into a null result.
+
 ## Debugging
 
 You will need to understand a bit of pydra to know how to debug this application for

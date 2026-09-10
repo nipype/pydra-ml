@@ -65,7 +65,7 @@ def test_get_permutation_importance_uses_full_pipeline():
     X, y, groups, feature_names = read_file(
         csv_file, x_indices=list(range(10)), target_vars=("target",)
     )
-    splits, split_indices = gen_splits(2, 0.2, X, y, groups)
+    splits, split_indices, _ = gen_splits(2, 0.2, X, y, groups)
     clf_info = ("sklearn.linear_model", "LogisticRegression", {"max_iter": 1000})
     _, model = train_test_kernel(X, y, splits, 0, clf_info, permute=False)
     importances = get_permutation_importance(

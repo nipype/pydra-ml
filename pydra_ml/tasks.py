@@ -49,7 +49,12 @@ def gen_splits(n_splits, test_size, X, Y, groups=None, random_state=0):
     :param Y: Sample target data
     :param groups: Grouping of sample data for shufflesplit
     :param random_state: randomization for shuffling (default 0)
-    :return: splits and indices to splits
+    :return: splits, indices to splits, and the realized mean test/train
+        sample-count ratio across those splits (used by report.py's
+        between-model significance test; computed from the actual split
+        arrays rather than from `test_size` directly since GroupShuffleSplit
+        selects whole groups, so the realized sample-level ratio can differ
+        from the nominal fraction when group sizes are uneven)
     """
     from sklearn.model_selection import GroupShuffleSplit
 
@@ -58,7 +63,10 @@ def gen_splits(n_splits, test_size, X, Y, groups=None, random_state=0):
     )
     train_test_splits = list(gss.split(X, Y, groups=groups))
     split_indices = list(range(n_splits))
-    return train_test_splits, split_indices
+    test_train_ratio = sum(
+        len(test) / len(train) for train, test in train_test_splits
+    ) / len(train_test_splits)
+    return train_test_splits, split_indices, test_train_ratio
 
 
 def _target_sample_weights(y, n_bins=10):
@@ -168,7 +176,10 @@ def train_test_kernel(
         # it's loaded as bytes, so we need to decode as utf-8
         X = np.array([str.encode(n[0]).decode("utf-8") for n in X])
     if permute:
-        y_train = y[np.random.permutation(train_index)]
+        # Seeded by split_index so the permuted-label null model is
+        # reproducible across runs (and so pydra's result caching, which
+        # hashes task inputs, actually reflects what was computed).
+        y_train = y[np.random.RandomState(split_index).permutation(train_index)]
     else:
         y_train = y[train_index]
     _fit_with_optional_target_weights(
@@ -182,6 +193,19 @@ def train_test_kernel(
     return (y[test_index], predicted, predicted_proba), (pipe, train_index, test_index)
 
 
+# sklearn.metrics functions that score predicted probabilities of the
+# positive class, not hard predicted labels. Passing hard 0/1 predictions
+# to these silently gives a badly wrong score (e.g. log_loss can be off by
+# an order of magnitude) rather than raising.
+_PROBABILITY_METRICS = {
+    "roc_auc_score",
+    "average_precision_score",
+    "log_loss",
+    "brier_score_loss",
+    "top_k_accuracy_score",
+}
+
+
 def calc_metric(output, metrics):
     """Calculate the scores for the predicted outputs
 
@@ -193,11 +217,20 @@ def calc_metric(output, metrics):
     for metric in metrics:
         metric_mod = __import__("sklearn.metrics", fromlist=[metric])
         metric_func = getattr(metric_mod, metric)
-        if metric == "roc_auc_score" and output[2] is not None:
-            # For roc_auc_score, we need to pass the probability of the positive class
-            score.append(metric_func(output[0], output[2][:, 1]))
-        else:
-            score.append(metric_func(output[0], output[1]))
+        if metric in _PROBABILITY_METRICS:
+            if output[2] is not None:
+                # Pass the predicted probability of the positive class.
+                score.append(metric_func(output[0], output[2][:, 1]))
+                continue
+            import warnings
+
+            warnings.warn(
+                f"{metric} expects predicted probabilities, but this "
+                "pipeline's final estimator does not implement "
+                "predict_proba; falling back to hard predicted labels, "
+                "which can badly misrepresent this metric."
+            )
+        score.append(metric_func(output[0], output[1]))
     return score, output
 
 
@@ -318,7 +351,18 @@ def get_shap(X, permute, model, gen_shap=False, nsamples="auto", l1_reg="aic"):
     pipe, train_index, test_index = model
     import shap
 
-    explainer = shap.KernelExplainer(pipe.predict, shap.kmeans(X[train_index], 5))
+    if hasattr(pipe, "predict_proba"):
+        # Explain the predicted probability of the positive class rather
+        # than the hard predicted label: KernelSHAP on a step function
+        # (hard 0/1 predictions) gives noisier, less informative
+        # attributions than on the underlying continuous score.
+        def predict_fn(x):
+            return pipe.predict_proba(x)[:, 1]
+
+    else:
+        predict_fn = pipe.predict
+
+    explainer = shap.KernelExplainer(predict_fn, shap.kmeans(X[train_index], 5))
     shaps = explainer.shap_values(
         X[test_index], nsamples=nsamples, l1_reg=l1_reg, silent=True
     )
@@ -368,7 +412,8 @@ def create_model(X, y, clf_info, permute, balance_target=False, target_n_bins=10
 
     y = y.ravel()
     if permute:
-        y_fit = y[np.random.permutation(range(len(y)))]
+        # Seeded for reproducibility, same rationale as train_test_kernel.
+        y_fit = y[np.random.RandomState(0).permutation(len(y))]
     else:
         y_fit = y
     _fit_with_optional_target_weights(pipe, X, y_fit, balance_target, target_n_bins)

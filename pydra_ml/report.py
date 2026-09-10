@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import os
 import pickle
 import warnings
@@ -8,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from scipy import stats
 from sklearn.metrics import accuracy_score, explained_variance_score
 
 matplotlib.use("Agg")
@@ -71,23 +73,30 @@ def performance_table(df, output_dir, round_decimals=2):
 
         for clf in classifier_names:
             data_median = round(df_metric_data_clean_median[clf], round_decimals)
-            ci_lower = round(
+            # 2.5-97.5 percentile interval of the per-split scores. This is
+            # NOT a true confidence interval -- the splits are overlapping,
+            # non-independent bootstrap resamples, so there is no coverage
+            # guarantee -- it is only descriptive of the observed spread.
+            interval_lower = round(
                 np.percentile(df_metric_data_clean[clf].values, 2.5), round_decimals
-            )  # 95% confidence interval
-            ci_upper = round(
+            )
+            interval_upper = round(
                 np.percentile(df_metric_data_clean[clf].values, 97.5), round_decimals
             )
             if "null" in df_metric.type.unique():
                 null_median = round(df_metric_null_clean_median[clf], 2)
                 df_summary.loc[0, clf] = (
-                    f"{data_median} [{ci_lower}–{ci_upper}; {null_median}]"
+                    f"{data_median} [{interval_lower}–{interval_upper}; {null_median}]"
                 )
             else:
-                df_summary.loc[0, clf] = f"{data_median} [{ci_lower}–{ci_upper}]"
+                df_summary.loc[0, clf] = (
+                    f"{data_median} [{interval_lower}–{interval_upper}]"
+                )
 
         df_summary.to_csv(
             os.path.join(
-                output_dir, f"test-performance-table_{metric}_with-95ci_{timestamp}.csv"
+                output_dir,
+                f"test-performance-table_{metric}_with-95interval_{timestamp}.csv",
             )
         )
     return
@@ -171,12 +180,10 @@ def gen_report_shap_class(results, output_dir="./", plot_top_n_shap=16):
     feature_names = results[0][1].output.feature_names
     # save all TP, TN, FP, FN indexes
     indexes_all = {}
+    labels = _clf_labels([r[0].get("ml_wf.clf_info") for r in results])
 
     for model_results in results:
-        model_name = model_results[0].get("ml_wf.clf_info")
-        if isinstance(model_name[0], list):
-            model_name = model_name[-1]
-        model_name = model_name[1]
+        model_name = labels[repr(model_results[0].get("ml_wf.clf_info"))]
         indexes_all[model_name] = []
         shaps = model_results[1].output.shaps
         # this is (N, P, F) N splits, P predictions, F feature_names
@@ -272,12 +279,10 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
     feature_names = results[0][1].output.feature_names
     # save all TP, TN, FP, FN indexes
     indexes_all = {}
+    labels = _clf_labels([r[0].get("ml_wf.clf_info") for r in results])
 
     for model_results in results:
-        model_name = model_results[0].get("ml_wf.clf_info")
-        if isinstance(model_name[0], list):
-            model_name = model_name[-1]
-        model_name = model_name[1]
+        model_name = labels[repr(model_results[0].get("ml_wf.clf_info"))]
         indexes_all[model_name] = []
         shaps = model_results[1].output.shaps
         # this is (N, P, F) N splits, P predictions, F feature_names
@@ -384,50 +389,227 @@ def permutation_test_pvalue(mean_score, distribution):
     return pvalue
 
 
-def compute_pairwise_stats(df):
-    """Run permutation test p-value across pairs of classifiers.
+_LOWER_IS_BETTER_METRICS = {"brier_score_loss"}
 
-    When comparing a classifier to itself, compare to its null distribution.
 
-    Assumes that the dataframe has three keys: Classifier, type, and score
-    with type referring to either the data distribution or the null distribution
+def corrected_resampled_ttest(diffs, test_train_ratio):
+    """Nadeau & Bengio (2003) corrected resampled paired t-test.
 
+    A plain paired t-test on per-split score differences assumes the splits
+    are independent. They are not: repeated random subsampling (as used by
+    GroupShuffleSplit here) draws overlapping train/test sets across splits,
+    which correlates the differences and makes a naive t-test underestimate
+    variance (inflating false positives) -- the same fold/split-dependence
+    problem described in Nadeau & Bengio (2003), "Inference for the
+    Generalization Error". Their correction inflates the naive variance by
+    (1/n + n_test/n_train), using the realized test/train sample-count ratio
+    in place of the (unobservable, without something like repeated
+    split-halves) true between-split correlation.
+
+    :param diffs: Per-split (model A - model B) score differences, all from
+        the same n_splits GroupShuffleSplit partition shared across models.
+    :param test_train_ratio: The realized mean test/train sample-count ratio
+        across those splits (see `tasks.gen_splits`) -- not the nominal
+        `test_size` fraction, since GroupShuffleSplit selects whole groups
+        and the realized sample-level ratio can differ from the nominal
+        fraction when group sizes are uneven, and this also stays correct
+        if a k-fold-style splitter is used instead (where it would work out
+        to roughly 1/(k-1)).
+    :return: (t_stat, p_value), two-sided, df = n - 1. Both are NaN if fewer
+        than 2 finite differences are available.
     """
-    N = len(df.Classifier.unique())
+    if not (isinstance(test_train_ratio, (int, float)) and test_train_ratio > 0):
+        raise ValueError(
+            "test_train_ratio must be a positive number, got " f"{test_train_ratio!r}"
+        )
+    diffs = np.asarray(diffs, dtype=float)
+    diffs = diffs[np.isfinite(diffs)]
+    n = len(diffs)
+    if n < 2:
+        return np.nan, np.nan
+    mean_diff = diffs.mean()
+    var_diff = diffs.var(ddof=1)
+    correction = 1.0 / n + test_train_ratio
+    corrected_var = correction * var_diff
+    if corrected_var == 0:
+        if mean_diff == 0:
+            return 0.0, 1.0
+        # Every per-split difference is identical: no finite sample can
+        # prove certainty, so fall back to the exact two-sided sign-test
+        # p-value (probability all n diffs share a sign under the null)
+        # rather than asserting an impossible p=0.
+        return np.sign(mean_diff) * np.inf, 2.0 ** -(n - 1)
+    t_stat = mean_diff / np.sqrt(corrected_var)
+    p_value = 2 * stats.t.sf(np.abs(t_stat), df=n - 1)
+    return t_stat, p_value
+
+
+def _holm_adjust(pvalues):
+    """Holm-Bonferroni step-down adjustment for a flat list of p-values."""
+    pvalues = np.asarray(pvalues, dtype=float)
+    m = len(pvalues)
+    order = np.argsort(pvalues)
+    adjusted = np.empty(m)
+    running_max = 0.0
+    for rank, idx in enumerate(order):
+        p = pvalues[idx]
+        adjusted_p = (m - rank) * p if np.isfinite(p) else p
+        running_max = (
+            max(running_max, adjusted_p) if np.isfinite(adjusted_p) else running_max
+        )
+        adjusted[idx] = min(running_max, 1.0) if np.isfinite(adjusted_p) else adjusted_p
+    return adjusted
+
+
+def compute_pairwise_stats(df, test_train_ratio, metric_name=None):
+    """Compare each pair of classifiers' per-split scores.
+
+    When comparing a classifier to itself, compare to its own null
+    (permuted-label) distribution with the Ojala & Garriga (2010) Test 1
+    permutation p-value. Unlike the off-diagonal comparison below, this is
+    conservative rather than exactly calibrated: it compares a *mean* over
+    splits to a reference distribution of *individual* per-split null
+    scores, whose spread is larger than that of the mean, so it under- (not
+    over-) rejects. It also has a coarse floor of 1/(n_splits+1) on the
+    achievable p-value.
+
+    Comparing two different classifiers instead uses a paired test on their
+    per-split score differences (joined on the "split" column, so the two
+    classifiers are compared on the exact same train/test partitions), via
+    `corrected_resampled_ttest`, which -- unlike a naive paired t-test or
+    comparing one classifier's mean to another's raw score distribution --
+    accounts for the correlation those shared, overlapping splits induce.
+
+    :param df: Columns Classifier, type, score, split, with type referring
+        to either the data distribution or the null distribution and split
+        identifying the shared train/test partition. Each classifier must
+        contribute at most one "data" row per split -- e.g. via
+        `report._clf_labels`, which guarantees distinct classifiers get
+        distinct labels -- or the paired comparison silently turns into a
+        many-to-many join.
+    :param test_train_ratio: Passed through to `corrected_resampled_ttest`.
+    :param metric_name: The metric these scores are for. Used only to flip
+        comparison direction for metrics in `_LOWER_IS_BETTER_METRICS`
+        (e.g. brier_score_loss), where a lower score is the better one.
+    :return: (effects, pvalues, adjusted_pvalues) -- Holm-corrected p-values
+        for the off-diagonal (between-classifier) entries only, since the
+        diagonal (self-vs-null) entries are a different test family; the
+        diagonal is passed through unadjusted.
+    """
+    sign = -1.0 if metric_name in _LOWER_IS_BETTER_METRICS else 1.0
+    order = [group[0] for group in df.groupby("Classifier")]
+    N = len(order)
     effects = np.zeros((N, N)) * np.nan
     pvalues = np.zeros((N, N)) * np.nan
-    for idx1, group1 in enumerate(df.groupby("Classifier")):
-        # group1 is a model name (e.g., "SVC")
-        filter = group1[1].apply(lambda x: x.type == "data", axis=1).values
-        group1df = group1[1].iloc[filter, :]
-        filter = group1[1].apply(lambda x: x.type == "null", axis=1).values
-        group1nulldf = group1[1].iloc[filter, :]
-        for idx2, group2 in enumerate(df.groupby("Classifier")):
-            filter = group2[1].apply(lambda x: x.type == "data", axis=1).values
-            group2df = group2[1].iloc[filter, :]
-            if group1[0] != group2[0]:
-                mean_score = np.mean(group1df["score"].values)
-                distribution = group2df["score"].values
-                pval = permutation_test_pvalue(mean_score, distribution)
-                stat = 0  # ToDo: compute effect size independent of permutation size
+    data_by_clf = {}
+    null_by_clf = {}
+    for name, group in df.groupby("Classifier"):
+        group_data = group[group["type"] == "data"]
+        counts = group_data.groupby("split").size()
+        if (counts > 1).any():
+            raise ValueError(
+                f"Classifier {name!r} has more than one 'data' row for the "
+                "same split -- classifier display names must be unique "
+                "(see report._clf_labels), otherwise the paired comparison "
+                "silently turns into a many-to-many join."
+            )
+        data_by_clf[name] = group_data
+        null_by_clf[name] = group[group["type"] == "null"]
+
+    off_diag_positions = []
+    off_diag_pvalues = []
+    for idx1, name1 in enumerate(order):
+        group1df = data_by_clf[name1]
+        group1nulldf = null_by_clf[name1]
+        for idx2, name2 in enumerate(order):
+            group2df = data_by_clf[name2]
+            if name1 != name2:
+                paired = group1df.merge(group2df, on="split", suffixes=("_1", "_2"))
+                diffs = sign * (paired["score_1"].values - paired["score_2"].values)
+                stat, pval = corrected_resampled_ttest(diffs, test_train_ratio)
+                off_diag_positions.append((idx1, idx2))
+                off_diag_pvalues.append(pval)
             else:
-                mean_score = np.mean(group1df["score"].values)
-                distribution = group1nulldf["score"].values
+                mean_score = sign * np.mean(group1df["score"].values)
+                distribution = sign * group1nulldf["score"].values
                 pval = permutation_test_pvalue(mean_score, distribution)
-                stat = (
-                    0  # ToDo: compute effect size independent of amount of permutations
-                )
+                stat = 0  # no comparable t-statistic for the null-distribution test
 
             effects[idx1, idx2] = stat
             pvalues[idx1, idx2] = pval
-    return effects, pvalues
+
+    adjusted_pvalues = pvalues.copy()
+    if off_diag_pvalues:
+        holm = _holm_adjust(off_diag_pvalues)
+        for (idx1, idx2), adj in zip(off_diag_positions, holm):
+            adjusted_pvalues[idx1, idx2] = adj
+    return effects, pvalues, adjusted_pvalues
+
+
+def _clf_base_name(clf_info):
+    """Derive the short display name of a clf_info entry from its final step."""
+    if isinstance(clf_info[0], list):
+        base = clf_info[-1][1]
+    else:
+        base = clf_info[1]
+    if "Classifier" in base:
+        name = base.split("Classifier")[0]
+    else:
+        name = base.split("Regressor")[0]
+    return name.split("CV")[0]
+
+
+def _clf_labels(clf_infos):
+    """Map each distinct clf_info (by repr) in a report to a display label.
+
+    Two different clf_info entries -- e.g. the same estimator with
+    different hyperparameters, or different pipelines that happen to end
+    in the same final estimator -- reduce to the same base name from
+    `_clf_base_name` alone, which silently merges their results into one
+    row/column of the report. Disambiguate any base name shared by more
+    than one distinct clf_info with a short deterministic hash of the
+    full clf_info.
+    """
+    by_base = {}
+    for clf_info in clf_infos:
+        key = repr(clf_info)
+        base = _clf_base_name(clf_info)
+        by_base.setdefault(base, {})[key] = clf_info
+
+    labels = {}
+    for base, variants in by_base.items():
+        if len(variants) == 1:
+            (key,) = variants.keys()
+            labels[key] = base
+        else:
+            for key in variants:
+                digest = hashlib.sha256(key.encode()).hexdigest()[:6]
+                labels[key] = f"{base}-{digest}"
+
+    seen = {}
+    for key, label in labels.items():
+        if seen.get(label, key) != key:
+            raise ValueError(
+                f"clf_info entries {seen[label]!r} and {key!r} both produced "
+                f"the report label {label!r}; please report this as a bug."
+            )
+        seen[label] = key
+    return labels
 
 
 def gen_report(
-    results, prefix, metrics, gen_shap=True, output_dir="./", plot_top_n_shap=16
+    results,
+    prefix,
+    metrics,
+    *,
+    test_train_ratio,
+    gen_shap=True,
+    output_dir="./",
+    plot_top_n_shap=16,
 ):
     if len(results) == 0:
         raise ValueError("results is empty")
+    labels = _clf_labels([val[0][prefix + ".clf_info"] for val in results])
     df = None
     for val in results:
         score = val[1].output.score
@@ -435,30 +617,23 @@ def gen_report(
             score = [score]
 
         clf = val[0][prefix + ".clf_info"]
-        if isinstance(clf[0], list):
-            clf = clf[-1][1]
-        else:
-            clf = clf[1]
-        if "Classifier" in clf:
-            name = clf.split("Classifier")[0]
-        else:
-            name = clf.split("Regressor")[0]
-        name = name.split("CV")[0]
+        name = labels[repr(clf)]
         permute = val[0][prefix + ".permute"]
-        for scoreval in score:
+        for split_idx, scoreval in enumerate(score):
             for idx, metric in enumerate(metrics):
                 new_row = {
                     "Classifier": name,
                     "type": "null" if permute else "data",
                     "metric": metrics[idx],
                     "score": scoreval[idx] if scoreval[idx] is not None else np.nan,
+                    "split": split_idx,
                 }
                 if df is None:
                     df = pd.DataFrame([new_row])
                 else:
                     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
-    # Generate table of median performance with 95% CI
+    # Generate table of median performance with 95% interval across splits
     # df_all = performance_table(results, prefix, output_dir, metrics, round_decimals=2)
     performance_table(df, output_dir, round_decimals=2)
 
@@ -496,18 +671,17 @@ def gen_report(
 
         # Create comparison stats table if the metric is a score
         if "score" in name:
-            (
-                effects,
-                pvalues,
-            ) = compute_pairwise_stats(subdf)
+            effects, pvalues, adjusted_pvalues = compute_pairwise_stats(
+                subdf, test_train_ratio, metric_name=name
+            )
             sns.set(style="whitegrid", palette="pastel", color_codes=True)
             sns.set_context("talk")
             plt.figure(figsize=(2 * len(order), 2 * len(order)))
             ax = sns.heatmap(
-                pvalues
+                adjusted_pvalues
                 <= 0.05,  # ToDo: When effects has been implemented, set this to: effects
-                annot=pvalues.round(3),  # ToDo: When effects has been implemented,
-                # set this to: np.fix(-np.log10(pvalues))
+                annot=adjusted_pvalues.round(3),  # ToDo: When effects has been
+                # implemented, set this to: np.fix(-np.log10(adjusted_pvalues))
                 yticklabels=order,
                 xticklabels=order,
                 cbar=False,  # ToDo: When effects has been implemented, set this to: True
@@ -522,7 +696,12 @@ def gen_report(
             plt.savefig(f"stats-{name}-{timestamp}.png")
             plt.close()
             save_obj(
-                dict(effects=effects, pvalues=pvalues, order=order),
+                dict(
+                    effects=effects,
+                    pvalues=pvalues,
+                    adjusted_pvalues=adjusted_pvalues,
+                    order=order,
+                ),
                 f"stats-{name}-{timestamp}.pkl",
             )
 

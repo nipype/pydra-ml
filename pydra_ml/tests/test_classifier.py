@@ -4,7 +4,14 @@ import numpy as np
 import pytest
 
 from ..classifier import gen_workflow, run_workflow
-from ..tasks import _fit_with_optional_target_weights, _target_sample_weights
+from ..tasks import (
+    _fit_with_optional_target_weights,
+    _target_sample_weights,
+    gen_splits,
+    get_permutation_importance,
+    read_file,
+    train_test_kernel,
+)
 
 
 def test_classifier(tmpdir):
@@ -46,6 +53,31 @@ def test_classifier(tmpdir):
     # MLP non-permuted final model (combination 1) should be a fitted pipeline
     assert hasattr(result.outputs.model[1], "predict")
     assert isinstance(result.outputs.model[1].predict(np.ones((1, 10))), np.ndarray)
+
+
+def test_get_permutation_importance_uses_full_pipeline():
+    # Regression test: get_permutation_importance used to score just the
+    # final estimator (pipe.steps[-1][1]) on raw, unscaled X, bypassing the
+    # StandardScaler step -- the estimator never saw data on that scale
+    # during training, so it scored near chance and returned near-zero
+    # importances for every feature, silently.
+    csv_file = os.path.join(os.path.dirname(__file__), "data", "breast_cancer.csv")
+    X, y, groups, feature_names = read_file(
+        csv_file, x_indices=list(range(10)), target_vars=("target",)
+    )
+    splits, split_indices = gen_splits(2, 0.2, X, y, groups)
+    clf_info = ("sklearn.linear_model", "LogisticRegression", {"max_iter": 1000})
+    _, model = train_test_kernel(X, y, splits, 0, clf_info, permute=False)
+    importances = get_permutation_importance(
+        X,
+        y,
+        permute=False,
+        model=model,
+        permutation_importance_n_repeats=10,
+        permutation_importance_scoring="accuracy",
+        gen_permutation_importance=True,
+    )
+    assert np.max(np.abs(importances)) > 0.01
 
 
 def test_classifier_with_resampling(tmpdir):

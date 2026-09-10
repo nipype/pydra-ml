@@ -143,11 +143,13 @@ def shaps_to_summary(
         shaps_n_splits.index = feature_names
     # else:
     # 	shaps_n_splits.index = [str(n) for n in shaps_n_splits.index]
-    # add summary stats
-    shaps_n_splits["mean"] = shaps_n_splits.mean(axis=1)
-    shaps_n_splits["std"] = shaps_n_splits.std(axis=1)
-    shaps_n_splits["min"] = shaps_n_splits.min(axis=1)
-    shaps_n_splits["max"] = shaps_n_splits.max(axis=1)
+    # add summary stats, computed from the split columns only (not from
+    # each other, e.g. "max" must not include the "mean"/"std" columns)
+    split_cols = shaps_n_splits.columns
+    shaps_n_splits["mean"] = shaps_n_splits[split_cols].mean(axis=1)
+    shaps_n_splits["std"] = shaps_n_splits[split_cols].std(axis=1)
+    shaps_n_splits["min"] = shaps_n_splits[split_cols].min(axis=1)
+    shaps_n_splits["max"] = shaps_n_splits[split_cols].max(axis=1)
     shaps_n_splits_sorted = shaps_n_splits.sort_values("mean")[::-1]
     shaps_n_splits_sorted.to_csv(f"{output_dir}summary_values_{filename}.csv")
 
@@ -302,7 +304,10 @@ def gen_report_shap_regres(results, output_dir="./", plot_top_n_shap=16):
             shaps_i = shaps[split_i]  # all shap values for this bootstrapping split
             y_true = y_true_and_preds[split_i][0]
             y_pred = y_true_and_preds[split_i][1]
-            split_performance = explained_variance_score(y_true, y_pred)
+            # Clip to [0, 1]: explained_variance_score is unbounded below for
+            # a poor model, and an unbounded negative weight would flip the
+            # sign of (and so invert the ranking of) the weighted SHAP values.
+            split_performance = max(explained_variance_score(y_true, y_pred), 0.0)
 
             # split prediction indexes into upper, median, lower, good for error auditing
             indexes = {"lp": [], "lm": [], "um": [], "up": []}

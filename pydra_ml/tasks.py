@@ -292,9 +292,9 @@ def get_permutation_importance(
 
     pipe, train_index, test_index = model
     results = permutation_importance(
-        pipe.steps[-1][1],
+        pipe,
         X[test_index],
-        y[test_index],
+        y[test_index].ravel(),
         scoring=permutation_importance_scoring,
         n_repeats=permutation_importance_n_repeats,
     )

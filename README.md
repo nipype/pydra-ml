@@ -20,7 +20,7 @@ to:
 
 
   ![alt text](https://github.com/danielmlow/pydra-ml/blob/master/examples/test_performance_with_null_roc_auc_score.png?raw=true)
-  Median performance across 50 bootstrapping splits (95% Confidence Interval; median performance of null model)
+  Median performance across 50 bootstrapping splits (95% interval across splits; median performance of null model)
 
 
 3. Save models and **not redo model training and evaluation** when new metrics are added, or when
@@ -325,7 +325,7 @@ Each model contains:
 without null distribution trained on permuted labels)
 - `performance_table-{timestamp}` folder:
   - `test-performance-table_{metric}_all-splits_{timestamp).csv` with the test performance of each the model/s trained on each bootstrapping split and median score
-  - `test-performance-table_accuracy_score_with-95ci-and-median-null_20210702T223005.935447``test-performance-table_{metric}_all-splits_{timestamp).csv` with the median score and 95% confidence interval (CI) and median score of null model if available: `median score [95% CI; median null score]`
+  - `test-performance-table_{metric}_with-95interval_{timestamp}.csv` with the median score and 95% interval across splits (not a true confidence interval, since splits are overlapping bootstrap resamples rather than independent draws) and median score of null model if available: `median score [95% interval; median null score]`
 - `stats-{metric}-{timestamp}.png`: one figure per any metric with the word `score` in it, containing a one tailed statistical comparison(row > column) of models using an empirical p-value, a common and effective measure for evaluating classifier performance (see Definition 1 in Ojala & Garriga, 2010) as implemented in [sklearn](https://github.com/scikit-learn/scikit-learn/blob/2beed5584/sklearn/model_selection/_validation.py#L1062). Annotation = p-value, color = significant over alpha level of 0.05.  The p-value represents the fraction of column-model scores where the row-model classifier had a higher mean performance (e.g., a p-value of 0.02 indicates that the mean score of a row model is higher than 98% of column-model scores). Data model vs. null model is displayed on the diagonal. The actual numeric values are stored in a correspondingly named pkl file.
 - `shap-{timestamp}` dir
     - SHAP values are computed for each prediction in each split's test set

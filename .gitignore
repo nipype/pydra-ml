@@ -140,3 +140,7 @@ dmypy.json
 
 # Generated messages
 /messages
+
+# uv lockfile (this project installs via `uv pip install`, not `uv sync`;
+# `uv run` generates this locally as a side effect)
+/uv.lock

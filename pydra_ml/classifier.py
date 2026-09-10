@@ -35,14 +35,20 @@ def ReadFile(
     return read_file(filename, x_indices, target_vars, group)
 
 
-@python.define(outputs={"splits": ty.Any, "split_indices": ty.Any})
+@python.define(
+    outputs={
+        "splits": ty.Any,
+        "split_indices": ty.Any,
+        "test_train_ratio": ty.Any,
+    }
+)
 def GenSplits(
     n_splits: int,
     test_size: float,
     X: ty.Any,
     Y: ty.Any,
     groups: ty.Any = None,
-) -> tuple[ty.Any, ty.Any]:
+) -> tuple[ty.Any, ty.Any, ty.Any]:
     return gen_splits(n_splits, test_size, X, Y, groups)
 
 
@@ -142,6 +148,7 @@ def CreateModel(
         "shaps": ty.Any,
         "feature_names": ty.Any,
         "model": ty.Any,
+        "test_train_ratio": ty.Any,
     }
 )
 def MLWorkflow(
@@ -164,7 +171,7 @@ def MLWorkflow(
     plot_top_n_shap: ty.Any,
     balance_target: bool = False,
     target_n_bins: int = 10,
-) -> tuple[ty.Any, ty.Any, ty.Any, ty.Any, ty.Any, ty.Any, ty.Any]:
+) -> tuple[ty.Any, ty.Any, ty.Any, ty.Any, ty.Any, ty.Any, ty.Any, ty.Any]:
     readcsv = workflow.add(
         ReadFile(
             filename=filename,
@@ -256,6 +263,7 @@ def MLWorkflow(
         shap_node.shaps,
         readcsv.feature_names,
         cm.model,
+        gensplit.test_train_ratio,
     )
 
 
@@ -373,10 +381,15 @@ def run_workflow(spec, worker, worker_args, specfile="localspec"):
     clf_infos = inputs["clf_info"]
     permutes = inputs["permute"]
     formatted = _format_results(result, clf_infos, permutes)
+    # Every (clf_info, permute) combination shares the same GenSplits call
+    # (fixed random_state=0), so the realized test/train ratio is identical
+    # across all of them; any one entry is representative.
+    test_train_ratio = result.outputs.test_train_ratio[0]
     gen_report(
         formatted,
         prefix="ml_wf",
         metrics=inputs["metrics"],
+        test_train_ratio=test_train_ratio,
         gen_shap=inputs["gen_shap"],
         plot_top_n_shap=inputs["plot_top_n_shap"],
     )

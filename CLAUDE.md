@@ -50,10 +50,16 @@ pydraml -s specification.json -p dask "address=tcp://host:8786"
 - **`sharp_test.py`** — Standalone, **experimental** SHARP (Split-HAlf RePeated)
   significance test for comparing two models' cross-validated performance without the
   fold-dependence problem that makes naive tests (like `report.py`'s pairwise empirical
-  p-value) invalid. Not wired into the pydra workflow; called directly (`sharp_compare`
-  or `split_half_repeated_cv` + `sharp_test`), and gated behind `experimental=True`
-  since it has a known, uncorrected anti-conservative miscalibration region — see its
-  module docstring before using or modifying it.
+  p-value) invalid. Implements the paper's *score test* variant: the nuisance parameters
+  (sigma2, rho) are re-fit by maximum likelihood with the mean pinned at the null, using
+  closed-form eigenstructure for `log|Sigma|`/`Sigma^-1` and an analytic profile over
+  sigma2, and the CI is obtained by inverting the same test. Not wired into the pydra
+  workflow; called directly (`sharp_compare` or `split_half_repeated_cv` +
+  `sharp_test`), and gated behind `experimental=True`: our simulations show it never
+  over-rejects but is markedly conservative (and under-powered) at small `rho`, worse
+  the smaller `n_repeats` is. The module docstring has the full J × rho calibration
+  table — read it before using or modifying this module, and re-run the simulations
+  and update the table if you change the estimator.
 
 ### Data flow
 

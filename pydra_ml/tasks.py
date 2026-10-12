@@ -285,8 +285,7 @@ def get_feature_importance(
         except AttributeError as e:
             import warnings
 
-            warnings.warn(
-                f""""
+            warnings.warn(f""""
 
                 Warning: you set gen_feature_importance to true, but it
                 could not be computed and will be returned as an empty list
@@ -304,8 +303,7 @@ def get_feature_importance(
                 set gen_feature_importance to false in the spec file.
 
                 This is the error that was returned by sklearn:\n\t{e}\n
-                """
-            )
+                """)
             feature_importance = []
     return feature_importance
 
